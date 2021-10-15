@@ -25,20 +25,67 @@ if(POLICY CMP0071)
   cmake_policy(SET CMP0071 NEW)
 endif()
 
+option(QT6 "Build with Qt6" OFF)
+
 # Set up vcpkg
-if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED VCPKG_ROOT)
-    set(VCPKG_ROOT "$ENV{VCPKG_ROOT}")
+if(WIN32 OR APPLE)
+  option(VCPKG "Use vcpkg for dependencies" ON)
+else()
+  option(VCPKG "Use vcpkg for dependencies" OFF)
 endif()
 
-if(DEFINED VCPKG_ROOT)
+if(VCPKG)
+  message(STATUS "Using dependencies from vcpkg")
+
+  if(QT6)
+    set(VCPKG_MANIFEST_FEATURES "qt6")
+  else()
+    set(VCPKG_MANIFEST_FEATURES "qt5")
+  endif()
+
   set(X_VCPKG_APPLOCAL_DEPS_INSTALL TRUE)
+
+  if(NOT DEFINED ENV{VCPKG_BINARY_SOURCES})
+    set(ENV{VCPKG_BINARY_SOURCES} "clear;nuget,mixxx-github-packages,read;default;")
+  endif()
+
+  set(VCPKG_FEATURE_FLAGS "-compilertracking,manifests,registries,versions")
+  set(VCPKG_INSTALL_OPTIONS "--x-abi-tools-use-exact-versions")
+
+  if(VCPKG_ROOT)
+    message(STATUS "Using dependencies from vcpkg repository at ${VCPKG_ROOT}")
+
+    if(NOT EXISTS "${VCPKG_ROOT}/.vcpkg-root")
+      message(FATAL_ERROR "${VCPKG_ROOT} is not a valid vcpkg root directory. Set VCPKG_ROOT to a root directory of a vcpkg git repository")
+    endif()
+  else()
+    message(STATUS "Using dependencies from vcpkg Git submodule")
+    set(VCPKG_ROOT "${CMAKE_SOURCE_DIR}/vcpkg")
+
+    if(NOT EXISTS "${VCPKG_ROOT}/.vcpkg-root")
+      find_package(Git)
+      if(NOT GIT_FOUND)
+        message(FATAL_ERROR "Unable to initialize vcpkg Git submodule because CMake was unable to find a git executable.")
+      endif()
+
+      message(STATUS "Initializing vcpkg Git submodule")
+      execute_process(
+        COMMAND ${GIT_EXECUTABLE} submodule init
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      )
+      execute_process(
+        COMMAND ${GIT_EXECUTABLE} submodule update
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+      )
+    endif()
+  endif()
 
   if(NOT DEFINED VCPKG_OVERLAY_PORTS)
     set(VCPKG_OVERLAY_PORTS "${VCPKG_ROOT}/overlay/ports")
-    if(APPLE)
-        list(APPEND VCPKG_OVERLAY_PORTS "${VCPKG_ROOT}/overlay/osx")
+    if(APPLE AND NOT QT6)
+      list(APPEND VCPKG_OVERLAY_PORTS "${VCPKG_ROOT}/overlay/osx")
     elseif(WIN32)
-        list(APPEND VCPKG_OVERLAY_PORTS "${VCPKG_ROOT}/overlay/windows")
+      list(APPEND VCPKG_OVERLAY_PORTS "${VCPKG_ROOT}/overlay/windows")
     endif()
   endif()
 
@@ -48,11 +95,23 @@ if(DEFINED VCPKG_ROOT)
 
   if(DEFINED ENV{VCPKG_DEFAULT_TRIPLET})
     set(VCPKG_TARGET_TRIPLET "$ENV{VCPKG_DEFAULT_TRIPLET}")
+  else()
+    if(APPLE)
+      if(QT6)
+        set(VCPKG_TARGET_TRIPLET "x64-osx-min10.14")
+        set(VCPKG_HOST_TRIPLET "x64-osx-min10.14")
+      else()
+        set(VCPKG_TARGET_TRIPLET "x64-osx-min10.12")
+        set(VCPKG_HOST_TRIPLET "x64-osx-min10.12")
+      endif()
+    endif()
   endif()
 
   if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
   endif()
+else()
+  message(STATUS "Using dependencies from system without vcpkg")
 endif()
 
 # Set a default build type if none was specified
@@ -74,8 +133,6 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
     message(FATAL_ERROR "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} is not supported, use one of Debug, Release or RelWithDebInfo.")
   endif()
 endif()
-
-option(QT6 "Build with Qt6" OFF)
 
 if(APPLE)
   if(QT6)
