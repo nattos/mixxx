@@ -740,6 +740,14 @@ bool BaseSqlTableModel::setTrackValueForColumn(
     return true;
 }
 
+bool BaseSqlTableModel::isModelGlobal() const {
+    return false;
+}
+
+QString BaseSqlTableModel::getTrackModelKey() const {
+    return m_tableName;
+}
+
 TrackPointer BaseSqlTableModel::getTrack(const QModelIndex& index) const {
     return m_pTrackCollectionManager->getTrackById(getTrackId(index));
 }

@@ -210,7 +210,16 @@ void BrowseTableModel::addSearchColumn(int index) {
 }
 
 void BrowseTableModel::setPath(mixxx::FileAccess path) {
+    m_path = path.info().location();
     m_pBrowseThread->executePopulation(std::move(path), this);
+}
+
+bool BrowseTableModel::isModelGlobal() const {
+    return false;
+}
+
+QString BrowseTableModel::getTrackModelKey() const {
+    return "browse:" + m_path;
 }
 
 TrackPointer BrowseTableModel::getTrack(const QModelIndex& index) const {

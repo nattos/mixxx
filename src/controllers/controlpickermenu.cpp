@@ -1282,6 +1282,11 @@ ControlPickerMenu::ControlPickerMenu(QWidget* pParent)
             tr("Switches between showing 2 and 4 effect units"),
             guiMenu);
     addControl("[Master]",
+            "use_simpleplayer",
+            tr("Use Simpler Player mode"),
+            tr("Use Simpler Player mode"),
+            guiMenu);
+    addControl("[Master]",
             "show_mixer",
             tr("Mixer Show/Hide"),
             tr("Show or hide the mixer."),

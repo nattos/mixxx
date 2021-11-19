@@ -77,7 +77,8 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
         SoundManager* sm,
         const PaDeviceInfo* deviceInfo,
         PaHostApiTypeId deviceTypeId,
-        unsigned int devIndex)
+        unsigned int devIndex,
+        bool isDefaultDevice)
         : SoundDevice(config, sm),
           m_pStream(nullptr),
           m_deviceInfo(deviceInfo),
@@ -94,7 +95,9 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
     // Setting parent class members:
     m_hostAPI = Pa_GetHostApiInfo(deviceInfo->hostApi)->name;
     m_dSampleRate = deviceInfo->defaultSampleRate;
-    if (m_deviceTypeId == paALSA) {
+    if (isDefaultDevice) {
+        m_deviceId.name = "kDefaultSoundDevice";
+    } else if (m_deviceTypeId == paALSA) {
         // PortAudio gives the device name including the ALSA hw device. The
         // ALSA hw device is an only somewhat reliable identifier; it may change
         // when an audio interface is unplugged or Linux is restarted. Separating
@@ -112,8 +115,8 @@ SoundDevicePortAudio::SoundDevicePortAudio(UserSettingsPointer config,
     } else {
         m_deviceId.name = deviceInfo->name;
     }
-    m_deviceId.portAudioIndex = devIndex;
-    m_strDisplayName = QString::fromUtf8(deviceInfo->name);
+    m_deviceId.portAudioIndex = isDefaultDevice ? -1 : devIndex;
+    m_strDisplayName = isDefaultDevice ? "System Default" : QString::fromUtf8(deviceInfo->name);
     m_iNumInputChannels = m_deviceInfo->maxInputChannels;
     m_iNumOutputChannels = m_deviceInfo->maxOutputChannels;
 
@@ -230,17 +233,21 @@ SoundDeviceError SoundDevicePortAudio::open(bool isClkRefDevice, int syncBuffers
     }
 
     //Fill out the rest of the info.
-    m_outputParams.device = m_deviceId.portAudioIndex;
+    int portAudioDeviceIndex = m_deviceId.portAudioIndex;
+    if (portAudioDeviceIndex < 0) {
+        portAudioDeviceIndex = Pa_GetDefaultOutputDevice();
+    }
+    m_outputParams.device = portAudioDeviceIndex;
     m_outputParams.sampleFormat = paFloat32;
     m_outputParams.suggestedLatency = bufferMSec / 1000.0;
     m_outputParams.hostApiSpecificStreamInfo = nullptr;
 
-    m_inputParams.device  = m_deviceId.portAudioIndex;
+    m_inputParams.device  = portAudioDeviceIndex;
     m_inputParams.sampleFormat  = paFloat32;
     m_inputParams.suggestedLatency = bufferMSec / 1000.0;
     m_inputParams.hostApiSpecificStreamInfo = nullptr;
 
-    qDebug() << "Opening stream with id" << m_deviceId.portAudioIndex;
+    qDebug() << "Opening stream with id" << portAudioDeviceIndex;
 
     m_lastCallbackEntrytoDacSecs = bufferMSec / 1000.0;
 
@@ -858,7 +865,7 @@ int SoundDevicePortAudio::callbackProcess(const SINT framesPerBuffer,
             m_pSoundManager->underflowHappened(5);
             //qDebug() << "callbackProcess read:" << "Buffer empty";
         }
-     }
+    }
     return paContinue;
 }
 

@@ -89,6 +89,14 @@ void DlgPrefSoundItem::refreshDevices(const QList<SoundDevicePointer>& devices) 
         deviceComboBox->addItem(pDevice->getDisplayName(), QVariant::fromValue(pDevice->getDeviceId()));
     }
     int newIndex = deviceComboBox->findData(QVariant::fromValue(oldDev));
+    if (newIndex < 0) {
+        for (int i = 0; i < deviceComboBox->count(); ++i) {
+            if (deviceComboBox->itemData(i).value<SoundDeviceId>().name == oldDev.name) {
+                newIndex = i;
+                break;
+            }
+        }
+    }
     if (newIndex != -1) {
         deviceComboBox->setCurrentIndex(newIndex);
     }

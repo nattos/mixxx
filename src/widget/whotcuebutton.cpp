@@ -12,9 +12,10 @@ namespace {
 constexpr int kDefaultDimBrightThreshold = 127;
 } // namespace
 
-WHotcueButton::WHotcueButton(const QString& group, QWidget* pParent)
+WHotcueButton::WHotcueButton(const QString& group, UserSettingsPointer pConfig, QWidget* pParent)
         : WPushButton(pParent),
           m_group(group),
+          m_pConfig(pConfig),
           m_hotcue(Cue::kNoHotCue),
           m_hoverCueColor(false),
           m_pCoColor(nullptr),
@@ -64,6 +65,8 @@ void WHotcueButton::setup(const QDomNode& node, const SkinContext& context) {
             ControlFlag::NoAssertIfMissing);
     m_pCoType->connectValueChanged(this, &WHotcueButton::slotTypeChanged);
     slotTypeChanged(m_pCoType->get());
+
+    m_pEditCuePoints = make_parented<ControlProxy>("[Controls]", "AutoPersistCues", this);
 
     auto* pLeftConnection = new ControlParameterWidgetConnection(
             this,
@@ -116,7 +119,9 @@ void WHotcueButton::mousePressEvent(QMouseEvent* e) {
                 return;
             }
             if (e->modifiers().testFlag(Qt::ShiftModifier)) {
-                pTrack->removeCue(pHotCue);
+                // TODO: Read persist cues from config.
+                bool isPersistCues = m_pEditCuePoints->get() != 0.;
+                pTrack->removeCue(pHotCue, isPersistCues);
                 return;
             }
             m_pCueMenuPopup->setTrackAndCue(pTrack, pHotCue);

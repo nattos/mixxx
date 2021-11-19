@@ -672,6 +672,11 @@ void DlgPrefSound::queryClicked() {
     ScopedWaitCursor cursor;
     m_pSoundManager->clearAndQueryDevices();
     updateAPIs();
+
+    m_config.clearInputs();
+    m_config.clearOutputs();
+    emit writePaths(&m_config);
+    m_pSoundManager->setConfig(m_config);
 }
 
 /**

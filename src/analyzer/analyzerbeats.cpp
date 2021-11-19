@@ -35,6 +35,8 @@ AnalyzerBeats::AnalyzerBeats(UserSettingsPointer pConfig, bool enforceBpmDetecti
           m_bPreferencesReanalyzeOldBpm(false),
           m_bPreferencesReanalyzeImported(false),
           m_bPreferencesFixedTempo(true),
+          m_iPreferencesMinBpm(88),
+          m_iPreferencesMaxBpm(175),
           m_bPreferencesFastAnalysis(false),
           m_totalSamples(0),
           m_iMaxSamplesToProcess(0),
@@ -62,6 +64,8 @@ bool AnalyzerBeats::initialize(TrackPointer pTrack,
     }
 
     m_bPreferencesFixedTempo = m_bpmSettings.getFixedTempoAssumption();
+    m_iPreferencesMinBpm = m_bpmSettings.getBpmDetectionPreferredMinBpm();
+    m_iPreferencesMaxBpm = m_bpmSettings.getBpmDetectionPreferredMaxBpm();
     m_bPreferencesReanalyzeOldBpm = m_bpmSettings.getReanalyzeWhenSettingsChange();
     m_bPreferencesReanalyzeImported = m_bpmSettings.getReanalyzeImported();
     m_bPreferencesFastAnalysis = m_bpmSettings.getFastAnalysis();
@@ -244,6 +248,41 @@ void AnalyzerBeats::storeResults(TrackPointer pTrack) {
         mixxx::Bpm bpm = m_pPlugin->getBpm();
         qDebug() << "AnalyzerBeats plugin detected constant BPM: " << bpm;
         pBeats = mixxx::Beats::fromConstTempo(m_sampleRate, mixxx::audio::kStartFramePos, bpm);
+    }
+
+    auto trackEndPosition = mixxx::audio::FramePos{pTrack->getDuration() * pBeats->getSampleRate()};
+    double bpm = pBeats->getBpmInRange(mixxx::audio::kStartFramePos, trackEndPosition).value();
+    const double kMinValidBpm = 10.;
+    const double kMaxValidBpm = 999.;
+    double minBpm = std::max(kMinValidBpm, std::min((double)m_iPreferencesMinBpm, kMaxValidBpm));
+    double maxBpm = std::max(kMinValidBpm, std::min((double)m_iPreferencesMaxBpm, kMaxValidBpm));
+    const double kEpsilon = 1e-3;
+    bool isBeyondMinBpm = bpm < minBpm - kEpsilon;
+    bool isBeyondMaxBpm = bpm > maxBpm + kEpsilon;
+    if (bpm > kMinValidBpm && bpm < kMaxValidBpm) {
+        if (isBeyondMinBpm || isBeyondMaxBpm) {
+            double newBpm = bpm;
+            // Note: We could use log, but this is more precise.
+            if (isBeyondMinBpm) {
+                while (newBpm < minBpm - kEpsilon) {
+                    newBpm *= 2.0;
+                    auto scaledBeats = pBeats->tryScale(mixxx::Beats::BpmScale::Double);
+                    if (!scaledBeats) {
+                        break;
+                    }
+                    pBeats = *scaledBeats;
+                }
+            } else {
+                while (newBpm > minBpm + kEpsilon) {
+                    newBpm *= 0.5;
+                    auto scaledBeats = pBeats->tryScale(mixxx::Beats::BpmScale::Halve);
+                    if (!scaledBeats) {
+                        break;
+                    }
+                    pBeats = *scaledBeats;
+                }
+            }
+        }
     }
 
     pTrack->trySetBeats(pBeats);

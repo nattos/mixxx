@@ -25,6 +25,15 @@
         <Layout>horizontal</Layout>
         <Children>
 
+          <Template src="skin:/controls/button_2state_persist.xml">
+            <SetVariable name="TooltipId">use_simpleplayer</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">61f,20f</SetVariable>
+            <SetVariable name="state_0_text">SIMPLE</SetVariable>
+            <SetVariable name="state_1_text">SIMPLE</SetVariable>
+            <SetVariable name="ConfigKey">[Master],use_simpleplayer</SetVariable>
+          </Template>
+
           <Template src="skin:/controls/button_2state.xml">
             <SetVariable name="TooltipId">show_waveforms</SetVariable>
             <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
@@ -78,7 +87,6 @@
             <SetVariable name="state_1_text">MIC/AUX</SetVariable>
             <SetVariable name="ConfigKey">[Microphone],show_microphone</SetVariable>
           </Template>
-
         </Children>
         <Connection>
           <ConfigKey>[Master],maximize_library</ConfigKey>
@@ -117,6 +125,60 @@
           <BindProperty>visible</BindProperty>
         </Connection>
       </WidgetGroup><!-- GUI toggles with maximized library -->
+
+      <WidgetGroup>
+        <ObjectName>ToolBarSection</ObjectName>
+        <SizePolicy>min,min</SizePolicy>
+        <Layout>horizontal</Layout>
+        <Children>
+          <WidgetGroup>
+            <SizePolicy>me,min</SizePolicy>
+            <MinimumSize>8,</MinimumSize>
+            <MaximumSize>12,</MaximumSize>
+          </WidgetGroup>
+
+          <Template src="skin:/controls/button_1state.xml">
+            <SetVariable name="TooltipId">playlist_prevtrack</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="state_0_text">&lt;</SetVariable>
+            <SetVariable name="ConfigKey">[Master],playlist_prevtrack</SetVariable>
+          </Template>
+
+          <Template src="skin:/controls/button_1state.xml">
+            <SetVariable name="TooltipId">playlist_play</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="state_0_text">▷</SetVariable>
+            <SetVariable name="ConfigKey">[Master],playlist_play</SetVariable>
+          </Template>
+
+          <Template src="skin:/controls/button_2state.xml">
+            <SetVariable name="TooltipId">playlist_pause</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="state_0_text">||</SetVariable>
+            <SetVariable name="state_1_text">||</SetVariable>
+            <SetVariable name="ConfigKey">[Master],playlist_pause</SetVariable>
+          </Template>
+
+          <Template src="skin:/controls/button_1state.xml">
+            <SetVariable name="TooltipId">playlist_stop</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="state_0_text">□</SetVariable>
+            <SetVariable name="ConfigKey">[Master],playlist_stop</SetVariable>
+          </Template>
+
+          <Template src="skin:/controls/button_1state.xml">
+            <SetVariable name="TooltipId">playlist_nexttrack</SetVariable>
+            <SetVariable name="ObjectName">GuiToggleButton</SetVariable>
+            <SetVariable name="Size">20f,20f</SetVariable>
+            <SetVariable name="state_0_text">&gt;</SetVariable>
+            <SetVariable name="ConfigKey">[Master],playlist_nexttrack</SetVariable>
+          </Template>
+        </Children>
+      </WidgetGroup>
 
       <WidgetGroup><Size>me,min</Size></WidgetGroup>
 

@@ -265,6 +265,7 @@ void MixxxMainWindow::initialize() {
             }
         }
     } while (retryClicked);
+        m_pCoreServices->getSoundManager()->closeDevices();
 
     // test for at least one out device, if none, display another dlg that
     // says "mixxx will barely work with no outs"
@@ -1121,6 +1122,9 @@ bool MixxxMainWindow::confirmExit() {
     bool playing(false);
     bool playingSampler(false);
     auto pPlayerManager = m_pCoreServices->getPlayerManager();
+    if (pPlayerManager->isUseSimplePlayer()) {
+        return true;
+    }
     unsigned int deckCount = pPlayerManager->numDecks();
     unsigned int samplerCount = pPlayerManager->numSamplers();
     for (unsigned int i = 0; i < deckCount; ++i) {

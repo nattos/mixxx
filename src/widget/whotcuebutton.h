@@ -13,7 +13,7 @@
 class WHotcueButton : public WPushButton {
     Q_OBJECT
   public:
-    WHotcueButton(const QString& group, QWidget* pParent);
+    WHotcueButton(const QString& group, UserSettingsPointer pConfig, QWidget* pParent);
 
     void setup(const QDomNode& node, const SkinContext& context) override;
 
@@ -35,10 +35,12 @@ class WHotcueButton : public WPushButton {
     void updateStyleSheet();
 
     const QString m_group;
+    UserSettingsPointer m_pConfig;
     int m_hotcue;
     bool m_hoverCueColor;
     parented_ptr<ControlProxy> m_pCoColor;
     parented_ptr<ControlProxy> m_pCoType;
+    parented_ptr<ControlProxy> m_pEditCuePoints;
     parented_ptr<WCueMenuPopup> m_pCueMenuPopup;
     int m_cueColorDimThreshold;
     bool m_bCueColorDimmed;

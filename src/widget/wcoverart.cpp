@@ -44,11 +44,11 @@ WCoverArt::WCoverArt(QWidget* parent,
     connect(m_pMenu, &WCoverArtMenu::reloadCoverArt, this, &WCoverArt::slotReloadCoverArt);
 
     if (m_pPlayer != nullptr) {
-        connect(m_pPlayer, &BaseTrackPlayer::newTrackLoaded, this, &WCoverArt::slotLoadTrack);
+        connect(m_pPlayer, &BaseTrackPlayer::newTrackLoaded, this, &WCoverArt::slotLoadTrackDirect);
         connect(m_pPlayer, &BaseTrackPlayer::loadingTrack, this, &WCoverArt::slotLoadingTrack);
 
         // just in case a track is already loaded
-        slotLoadTrack(m_pPlayer->getLoadedTrack());
+        handleLoadTrack(m_pPlayer->getLoadedTrack());
     }
 }
 
@@ -116,7 +116,7 @@ void WCoverArt::slotEnable(bool enable) {
     m_bEnable = enable;
 
     if (wasDisabled) {
-        slotLoadTrack(m_loadedTrack);
+        handleLoadTrack(m_loadedTrack);
     }
     update();
 }
@@ -170,7 +170,15 @@ void WCoverArt::slotCoverFound(
     }
 }
 
-void WCoverArt::slotLoadTrack(TrackPointer pTrack) {
+void WCoverArt::slotLoadTrack(TrackCursor cursor) {
+    handleLoadTrack(cursor.Track);
+}
+
+void WCoverArt::slotLoadTrackDirect(TrackPointer pTrack) {
+    handleLoadTrack(pTrack);
+}
+
+void WCoverArt::handleLoadTrack(TrackPointer pTrack) {
     if (m_loadedTrack) {
         disconnect(m_loadedTrack.get(),
                 &Track::coverArtUpdated,

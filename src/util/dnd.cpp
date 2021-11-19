@@ -18,7 +18,16 @@ QDrag* dragUrls(
     }
 
     QMimeData* mimeData = new QMimeData();
-    mimeData->setUrls(trackUrls);
+    // QT bug with drag and drop MacOS 1.12 Mojave
+    if (trackUrls.size() <= 1) {
+        mimeData->setUrls(trackUrls);
+    } else {
+        QStringList trackStrings;
+        for (auto& url : trackUrls) {
+            trackStrings.append(url.toString());
+        }
+        mimeData->setData("text/strings", trackStrings.join("\n").toUtf8());
+    }
     mimeData->setText(sourceIdentifier);
 
     QDrag* drag = new QDrag(pDragSource);
@@ -51,16 +60,16 @@ QList<mixxx::FileInfo> dropEventFiles(
         const QString& sourceIdentifier,
         bool firstOnly,
         bool acceptPlaylists) {
-    qDebug() << "dropEventFiles()" << mimeData.hasUrls() << mimeData.urls();
+    qDebug() << "dropEventFiles()" << DragAndDropHelper::hasUrls(&mimeData) << mimeData.urls();
     qDebug() << "mimeData.hasText()" << mimeData.hasText() << mimeData.text();
 
-    if (!mimeData.hasUrls() ||
+    if (!DragAndDropHelper::hasUrls(&mimeData) ||
             (mimeData.hasText() && mimeData.text() == sourceIdentifier)) {
         return {};
     }
 
     return DragAndDropHelper::supportedTracksFromUrls(
-            mimeData.urls(),
+            DragAndDropHelper::getUrls(&mimeData),
             firstOnly,
             acceptPlaylists);
 }
@@ -87,6 +96,32 @@ bool allowLoadToPlayer(
 }
 
 } // anonymous namespace
+
+bool DragAndDropHelper::hasUrls(const QMimeData* mimeData) {
+    if (mimeData->hasUrls()) {
+        return true;
+    }
+    if (mimeData->hasFormat("text/strings")) {
+        return true;
+    }
+    return false;
+}
+QList<QUrl> DragAndDropHelper::getUrls(const QMimeData* mimeData) {
+    if (mimeData->hasUrls()) {
+        return mimeData->urls();
+    }
+    if (mimeData->hasFormat("text/strings")) {
+        QList<QUrl> urls;
+        QByteArray data = mimeData->data("text/strings");
+        QString str = QString::fromUtf8(data);
+        QStringList parts = str.split("\n");
+        for (auto& part : parts) {
+            urls.append(part);
+        }
+        return urls;
+    }
+    return QList<QUrl>();
+}
 
 //static
 QList<mixxx::FileInfo> DragAndDropHelper::supportedTracksFromUrls(

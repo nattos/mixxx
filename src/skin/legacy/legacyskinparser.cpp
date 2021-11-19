@@ -1331,7 +1331,7 @@ QWidget* LegacySkinParser::parseCoverArt(const QDomElement& node) {
         // Connect cover art signals to the library
         connect(m_pLibrary, &Library::switchToView, pCoverArt, &WCoverArt::slotReset);
         connect(m_pLibrary, &Library::enableCoverArtDisplay, pCoverArt, &WCoverArt::slotEnable);
-        connect(m_pLibrary, &Library::trackSelected, pCoverArt, &WCoverArt::slotLoadTrack);
+        connect(m_pLibrary, &Library::trackSelected, pCoverArt, &WCoverArt::slotLoadTrackDirect);
     } else if (pPlayer != nullptr) {
         connect(pCoverArt,
                 &WCoverArt::trackDropped,
@@ -1653,7 +1653,7 @@ QString LegacySkinParser::getSharedGroupString(const QString& channelStr) {
 
 QWidget* LegacySkinParser::parseHotcueButton(const QDomElement& element) {
     QString group = lookupNodeGroup(element);
-    WHotcueButton* pWidget = new WHotcueButton(group, m_pParent);
+    WHotcueButton* pWidget = new WHotcueButton(group, m_pConfig, m_pParent);
     commonWidgetSetup(element, pWidget);
     pWidget->setup(element, *m_pContext);
     pWidget->installEventFilter(m_pKeyboard);

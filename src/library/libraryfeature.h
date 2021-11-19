@@ -121,6 +121,7 @@ class LibraryFeature : public QObject {
         Q_UNUSED(index);
     }
   signals:
+    void willUnloadTrackModel(QAbstractItemModel* model);
     void showTrackModel(QAbstractItemModel* model);
     void switchToView(const QString& view);
     void loadTrack(TrackPointer pTrack);

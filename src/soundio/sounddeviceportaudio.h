@@ -17,7 +17,8 @@ class SoundDevicePortAudio : public SoundDevice {
             SoundManager* sm,
             const PaDeviceInfo* deviceInfo,
             PaHostApiTypeId deviceTypeId,
-            unsigned int devIndex);
+            unsigned int devIndex,
+            bool isDefaultDevice);
     ~SoundDevicePortAudio() override;
 
     SoundDeviceError open(bool isClkRefDevice, int syncBuffers) override;

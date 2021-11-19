@@ -235,6 +235,10 @@ void Tooltips::addStandardTooltips() {
             << tr("Microphone")
             << tr("Show/hide the Microphone section.");
 
+    add("use_simpleplayer")
+            << tr("Simple Player")
+            << tr("Use Simpler Player mode.");
+
     add("show_samplers")
             << tr("Sampler")
             << tr("Show/hide the Sampler section.");

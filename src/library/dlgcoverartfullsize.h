@@ -28,7 +28,8 @@ class DlgCoverArtFullSize
     void closeEvent(QCloseEvent* event) override;
 
   public slots:
-    void slotLoadTrack(TrackPointer);
+    void slotLoadTrack(TrackCursor);
+    void slotLoadTrackDirect(TrackPointer);
     void slotCoverFound(
             const QObject* pRequestor,
             const CoverInfo& coverInfo,
@@ -43,6 +44,8 @@ class DlgCoverArtFullSize
     void slotReloadCoverArt();
 
   private:
+    void handleLoadTrack(TrackPointer);
+
     QPixmap m_pixmap;
     TrackPointer m_pLoadedTrack;
     BaseTrackPlayer* m_pPlayer;

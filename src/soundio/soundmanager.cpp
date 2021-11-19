@@ -26,6 +26,12 @@
 #include "util/versionstore.h"
 #include "vinylcontrol/defs_vinylcontrol.h"
 
+
+
+#include <AudioUnit/AudioUnit.h>
+#include <AudioToolbox/AudioToolbox.h>
+
+
 typedef PaError (*SetJackClientName)(const char *name);
 
 namespace {
@@ -41,6 +47,14 @@ struct DeviceMode {
 #ifdef __LINUX__
 constexpr unsigned int kSleepSecondsAfterClosingDevice = 5;
 #endif
+
+static OSStatus callbackAudioHardwarePropertyDefaultOutputDevice(AudioHardwarePropertyID inPropertyID, SoundManager* self) {
+    if (inPropertyID == kAudioHardwarePropertyDefaultOutputDevice) {
+        self->refreshDefaultDevices();
+    }
+    return noErr;
+}
+
 } // anonymous namespace
 
 SoundManager::SoundManager(UserSettingsPointer pConfig,
@@ -82,9 +96,35 @@ SoundManager::SoundManager(UserSettingsPointer pConfig,
     }
     checkConfig();
     m_config.writeToDisk(); // in case anything changed by applying defaults
+
+    m_pMaster->onRequestAwake = [this]() {
+        for (const auto& pDevice: qAsConst(m_devices)) {
+            if (pDevice->isOpen()) {
+                // Already open.
+                return;
+            }
+        }
+        if (setupDevices() != SOUNDDEVICE_ERROR_OK) {
+            clearAndQueryDevices();
+            setupDevices();
+        }
+    };
+    m_pMaster->isAwake = [this]() {
+        for (const auto& pDevice: qAsConst(m_devices)) {
+            if (pDevice->isOpen()) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    AudioHardwareAddPropertyListener(kAudioHardwarePropertyDefaultOutputDevice, (AudioHardwarePropertyListenerProc)callbackAudioHardwarePropertyDefaultOutputDevice, this);
 }
 
 SoundManager::~SoundManager() {
+    m_pMaster->onRequestAwake = nullptr;
+    m_pMaster->isAwake = nullptr;
+
     // Clean up devices.
     const bool sleepAfterClosing = false;
     clearDeviceList(sleepAfterClosing);
@@ -143,6 +183,28 @@ QList<QString> SoundManager::getHostAPIList() const {
     }
 
     return apiList;
+}
+
+void SoundManager::refreshDefaultDevices() {
+    qCritical() << "SoundManager::refreshDefaultDevices";
+    bool isUsingDefaultDevice = false;
+    bool isOpen = false;
+    for (const auto& pDevice: qAsConst(m_devices)) {
+        // TODO: Hack for now, compare strings directly.
+        if (pDevice->getDeviceId().name == "kDefaultSoundDevice") {
+            isUsingDefaultDevice = true;;
+        }
+        if (pDevice->isOpen()) {
+            isOpen = true;
+        }
+    }
+
+    if (isUsingDefaultDevice) {
+        clearAndQueryDevices();
+        if (isOpen) {
+            setupDevices();
+        }
+    }
 }
 
 void SoundManager::closeDevices(bool sleepAfterClosing) {
@@ -302,13 +364,36 @@ void SoundManager::queryDevicesPortaudio() {
          */
         const auto deviceTypeId = paApiIndexToTypeId.value(deviceInfo->hostApi);
         auto currentDevice = SoundDevicePointer(new SoundDevicePortAudio(
-                m_pConfig, this, deviceInfo, deviceTypeId, i));
+                m_pConfig, this, deviceInfo, deviceTypeId, i, false));
         m_devices.push_back(currentDevice);
         if (!strcmp(Pa_GetHostApiInfo(deviceInfo->hostApi)->name,
                     MIXXX_PORTAUDIO_JACK_STRING)) {
             m_jackSampleRate = static_cast<mixxx::audio::SampleRate::value_t>(
                     deviceInfo->defaultSampleRate);
         }
+    }
+    {
+        int i = Pa_GetDefaultOutputDevice();
+        deviceInfo = Pa_GetDeviceInfo(i);
+        if (!deviceInfo) {
+            return;
+        }
+        /* deviceInfo fields for quick reference:
+            int     structVersion
+            const char *    name
+            PaHostApiIndex  hostApi
+            int     maxInputChannels
+            int     maxOutputChannels
+            PaTime  defaultLowInputLatency
+            PaTime  defaultLowOutputLatency
+            PaTime  defaultHighInputLatency
+            PaTime  defaultHighOutputLatency
+            double  defaultSampleRate
+         */
+        const auto deviceTypeId = paApiIndexToTypeId.value(deviceInfo->hostApi);
+        auto currentDevice = SoundDevicePointer(new SoundDevicePortAudio(
+                m_pConfig, this, deviceInfo, deviceTypeId, i, true));
+        m_devices.push_back(currentDevice);
     }
 }
 
@@ -591,6 +676,14 @@ void SoundManager::onDeviceOutputCallback(const SINT iFramesPerBuffer) {
     // Produce a block of samples for output. EngineMaster expects stereo
     // samples so multiply iFramesPerBuffer by 2.
     m_pMaster->process(iFramesPerBuffer * 2);
+    if (!m_pMaster->keepAwake) {
+        QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    this->closeDevices();
+                },
+                Qt::QueuedConnection);
+    }
 }
 
 void SoundManager::pushInputBuffers(const QList<AudioInputBuffer>& inputs,

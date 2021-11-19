@@ -52,6 +52,14 @@ const QVector<int> ProxyTrackModel::getTrackRows(TrackId trackId) const {
     return m_pTrackModel ? m_pTrackModel->getTrackRows(trackId) : QVector<int>();
 }
 
+bool ProxyTrackModel::isModelGlobal() const {
+    return m_pTrackModel ? m_pTrackModel->isModelGlobal() : false;
+}
+
+QString ProxyTrackModel::getTrackModelKey() const {
+    return m_pTrackModel ? m_pTrackModel->getTrackModelKey() : QString();
+}
+
 TrackPointer ProxyTrackModel::getTrack(const QModelIndex& index) const {
     QModelIndex indexSource = mapToSource(index);
     return m_pTrackModel ? m_pTrackModel->getTrack(indexSource) : TrackPointer();

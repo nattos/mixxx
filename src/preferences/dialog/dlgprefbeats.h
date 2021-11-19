@@ -28,6 +28,7 @@ class DlgPrefBeats : public DlgPreferencePage, public Ui::DlgBeatsDlg {
     void pluginSelected(int i);
     void analyzerEnabled(int i);
     void fixedtempoEnabled(int i);
+    void slotPreferredBpmRangeChanged(int i);
     void fastAnalysisEnabled(int i);
     void slotReanalyzeChanged(int value);
     void slotReanalyzeImportedChanged(int value);
@@ -40,6 +41,8 @@ class DlgPrefBeats : public DlgPreferencePage, public Ui::DlgBeatsDlg {
     QString m_selectedAnalyzerId;
     bool m_bAnalyzerEnabled;
     bool m_bFixedTempoEnabled;
+    int m_iPreferredMinBpm;
+    int m_iPreferredMaxBpm;
     bool m_bFastAnalysisEnabled;
     bool m_bReanalyze;
     bool m_bReanalyzeImported;

@@ -17,6 +17,10 @@ LibraryTableModel::LibraryTableModel(QObject* parent,
 LibraryTableModel::~LibraryTableModel() {
 }
 
+bool LibraryTableModel::isModelGlobal() const {
+    return true;
+}
+
 void LibraryTableModel::setTableModel() {
     const QString tableName("library_view");
 

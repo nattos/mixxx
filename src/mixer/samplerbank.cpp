@@ -181,7 +181,7 @@ bool SamplerBank::loadSamplerBankFromPath(const QString& samplerBankPath) {
                     }
 
                     if (location.isEmpty()) {
-                        m_pPlayerManager->slotLoadTrackToPlayer(TrackPointer(), group);
+                        m_pPlayerManager->slotLoadTrackToPlayer(TrackCursor(), group);
                     } else {
                         m_pPlayerManager->slotLoadToPlayer(location, group);
                     }

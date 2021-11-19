@@ -491,6 +491,14 @@ void WTrackTableView::onSearch(const QString& text) {
 void WTrackTableView::onShow() {
 }
 
+void WTrackTableView::mousePressEvent(QMouseEvent* pEvent) {
+    WLibraryTableView::mousePressEvent(pEvent);
+
+    if (pEvent->buttons() == Qt::LeftButton) {
+        m_mouseDownPoint = pEvent->pos();
+    }
+}
+
 void WTrackTableView::mouseMoveEvent(QMouseEvent* pEvent) {
     // Only use this for drag and drop if the LeftButton is pressed we need to
     // check for this because mousetracking is activated and this function is
@@ -500,6 +508,9 @@ void WTrackTableView::mouseMoveEvent(QMouseEvent* pEvent) {
         // outside of this if statement then we get 'ghost' drags. See Bug
         // #1008737
         WLibraryTableView::mouseMoveEvent(pEvent);
+        return;
+    }
+    if ((m_mouseDownPoint - pEvent->pos()).manhattanLength() < 5.0) {
         return;
     }
 
@@ -512,20 +523,27 @@ void WTrackTableView::mouseMoveEvent(QMouseEvent* pEvent) {
     QList<QString> locations;
     const QModelIndexList indices = selectionModel()->selectedRows();
 
+    bool draggedIndexIsSelected = false;
+    QModelIndex draggedIndex = indexAt(pEvent->pos());
     for (const QModelIndex& index : indices) {
         if (!index.isValid()) {
             continue;
         }
+        if (draggedIndex.row() == index.row()) {
+            draggedIndexIsSelected = true;
+        }
         locations.append(trackModel->getTrackLocation(index));
     }
-    DragAndDropHelper::dragTrackLocations(locations, this, "library");
+    if (draggedIndexIsSelected) {
+        DragAndDropHelper::dragTrackLocations(locations, this, "library");
+    }
 }
 
 // Drag enter event, happens when a dragged item hovers over the track table view
 void WTrackTableView::dragEnterEvent(QDragEnterEvent * event) {
     auto* trackModel = getTrackModel();
     //qDebug() << "dragEnterEvent" << event->mimeData()->formats();
-    if (event->mimeData()->hasUrls()) {
+    if (DragAndDropHelper::hasUrls(event->mimeData())) {
         if (event->source() == this) {
             if (trackModel->hasCapabilities(TrackModel::Capability::Reorder)) {
                 event->acceptProposedAction();
@@ -549,7 +567,7 @@ void WTrackTableView::dragMoveEvent(QDragMoveEvent * event) {
     WLibraryTableView::dragMoveEvent(event);
 
     //qDebug() << "dragMoveEvent" << event->mimeData()->formats();
-    if (event->mimeData()->hasUrls())
+    if (DragAndDropHelper::hasUrls(event->mimeData()))
     {
         if (event->source() == this) {
             if (trackModel->hasCapabilities(TrackModel::Capability::Reorder)) {
@@ -575,7 +593,7 @@ void WTrackTableView::dropEvent(QDropEvent * event) {
         return;
     }
 
-    if (!event->mimeData()->hasUrls() || trackModel->isLocked()) {
+    if (!DragAndDropHelper::hasUrls(event->mimeData()) || trackModel->isLocked()) {
         event->ignore();
         return;
     }
@@ -724,7 +742,7 @@ void WTrackTableView::dropEvent(QDropEvent * event) {
         {
             const QList<mixxx::FileInfo> trackFileInfos =
                     DragAndDropHelper::supportedTracksFromUrls(
-                            event->mimeData()->urls(), false, true);
+                            DragAndDropHelper::getUrls(event->mimeData()), false, true);
             QList<QString> trackLocations;
             trackLocations.reserve(trackFileInfos.size());
             for (const auto& fileInfo : trackFileInfos) {

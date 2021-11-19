@@ -84,6 +84,10 @@ public slots:
   void slotControlRatePermUpSmall(double);
   void slotControlFastForward(double);
   void slotControlFastBack(double);
+  void slotEngineWakeRequested();
+
+signals:
+  void engineWakeRequested();
 
 private:
   void processTempRate(const int bufferSamples);

@@ -75,7 +75,7 @@ class HotcueControlTest : public BaseSignalPathTest {
     }
 
     void unloadTrack() {
-        m_pMixerDeck1->slotLoadTrack(TrackPointer(), false);
+        m_pMixerDeck1->slotLoadTrack(TrackCursor(), false);
     }
 
     mixxx::audio::FramePos currentFramePosition() {

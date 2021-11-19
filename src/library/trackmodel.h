@@ -97,6 +97,9 @@ class TrackModel {
         NumOfIds = (IdMax - IdMin) + 1
     };
 
+    virtual bool isModelGlobal() const = 0;
+    virtual QString getTrackModelKey() const = 0;
+
     // Deserialize and return the track at the given QModelIndex
     // or TrackRef in this result set.
     virtual TrackPointer getTrack(const QModelIndex& index) const = 0;

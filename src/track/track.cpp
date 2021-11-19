@@ -74,7 +74,8 @@ Track::Track(
           m_fileAccess(std::move(fileAccess)),
           m_record(trackId),
           m_bDirty(false),
-          m_bMarkedForMetadataExport(false) {
+          m_bMarkedForMetadataExport(false),
+          m_saveCuePoints(false) {
     if (kLogStats && kLogger.debugEnabled()) {
         long numberOfInstancesBefore = s_numberOfInstances.fetch_add(1);
         kLogger.debug()
@@ -869,7 +870,7 @@ void Track::setWaveformSummary(ConstWaveformPointer pWaveform) {
     emit waveformSummaryUpdated();
 }
 
-void Track::setMainCuePosition(mixxx::audio::FramePos position) {
+void Track::setMainCuePosition(mixxx::audio::FramePos position, bool persist) {
     auto locked = lockMutex(&m_qMutex);
 
     if (!compareAndSet(m_record.ptrMainCuePosition(), position)) {
@@ -903,11 +904,15 @@ void Track::setMainCuePosition(mixxx::audio::FramePos position) {
         m_cuePoints.removeOne(pLoadCue);
     }
 
+    if (persist) {
+        setSaveCuePoints(true);
+    }
+
     markDirtyAndUnlock(&locked);
     emit cuesUpdated();
 }
 
-void Track::shiftCuePositionsMillis(double milliseconds) {
+void Track::shiftCuePositionsMillis(double milliseconds, bool persist) {
     auto locked = lockMutex(&m_qMutex);
 
     VERIFY_OR_DEBUG_ASSERT(m_record.getStreamInfoFromSource()) {
@@ -916,6 +921,10 @@ void Track::shiftCuePositionsMillis(double milliseconds) {
     double frames = m_record.getStreamInfoFromSource()->getSignalInfo().millis2frames(milliseconds);
     for (const CuePointer& pCue : qAsConst(m_cuePoints)) {
         pCue->shiftPositionFrames(frames);
+    }
+
+    if (persist) {
+        setSaveCuePoints(true);
     }
 
     markDirtyAndUnlock(&locked);
@@ -939,7 +948,8 @@ CuePointer Track::createAndAddCue(
         mixxx::CueType type,
         int hotCueIndex,
         mixxx::audio::FramePos startPosition,
-        mixxx::audio::FramePos endPosition) {
+        mixxx::audio::FramePos endPosition,
+        bool persist) {
     VERIFY_OR_DEBUG_ASSERT(hotCueIndex == Cue::kNoHotCue ||
             hotCueIndex >= mixxx::kFirstHotCueIndex) {
         return CuePointer{};
@@ -962,7 +972,10 @@ CuePointer Track::createAndAddCue(
             &Track::slotCueUpdated);
     auto locked = lockMutex(&m_qMutex);
     m_cuePoints.push_back(pCue);
-    markDirtyAndUnlock(&locked);
+    if (persist) {
+        setSaveCuePoints(true);
+    }
+   markDirtyAndUnlock(&locked);
     emit cuesUpdated();
     return pCue;
 }
@@ -992,7 +1005,7 @@ CuePointer Track::findCueById(DbId id) const {
     return CuePointer();
 }
 
-void Track::removeCue(const CuePointer& pCue) {
+void Track::removeCue(const CuePointer& pCue, bool persist) {
     if (!pCue) {
         return;
     }
@@ -1003,11 +1016,14 @@ void Track::removeCue(const CuePointer& pCue) {
     if (pCue->getType() == mixxx::CueType::MainCue) {
         m_record.setMainCuePosition(mixxx::audio::kStartFramePos);
     }
+    if (persist) {
+        setSaveCuePoints(true);
+    }
     markDirtyAndUnlock(&locked);
     emit cuesUpdated();
 }
 
-void Track::removeCuesOfType(mixxx::CueType type) {
+void Track::removeCuesOfType(mixxx::CueType type, bool persist) {
     auto locked = lockMutex(&m_qMutex);
     bool dirty = false;
     QMutableListIterator<CuePointer> it(m_cuePoints);
@@ -1024,12 +1040,15 @@ void Track::removeCuesOfType(mixxx::CueType type) {
         dirty = true;
     }
     if (dirty) {
+        if (persist) {
+            setSaveCuePoints(true);
+        }
         markDirtyAndUnlock(&locked);
         emit cuesUpdated();
     }
 }
 
-void Track::setCuePoints(const QList<CuePointer>& cuePoints) {
+void Track::setCuePoints(const QList<CuePointer>& cuePoints, bool persist) {
     // While this method could be called from any thread,
     // associated Cue objects should always live on the
     // same thread as their host, namely this->thread().
@@ -1037,9 +1056,22 @@ void Track::setCuePoints(const QList<CuePointer>& cuePoints) {
         pCue->moveToThread(thread());
     }
     auto locked = lockMutex(&m_qMutex);
+    if (persist) {
+        setSaveCuePoints(true);
+    }
     setCuePointsMarkDirtyAndUnlock(
             &locked,
             cuePoints);
+}
+
+void Track::setSaveCuePoints(bool value) {
+    auto locked = lockMutex(&m_qMutex);
+    if (m_saveCuePoints == value) {
+        return;
+    }
+    m_saveCuePoints = value;
+    markDirtyAndUnlock(&locked);
+    emit saveCuePointsChanged(value);
 }
 
 Track::ImportStatus Track::tryImportBeats(

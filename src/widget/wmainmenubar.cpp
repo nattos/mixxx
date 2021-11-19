@@ -225,6 +225,19 @@ void WMainMenuBar::initialize() {
     createVisibilityControl(pViewShowMicrophone, ConfigKey("[Microphone]", "show_microphone"));
     pViewMenu->addAction(pViewShowMicrophone);
 
+    QString useSimplePlayerTitle = tr("Simple Player Mode");
+    QString useSimplePlayerText = tr("Use Simple Player mode.");
+    auto* pViewUseSimplePlayer = new QAction(useSimplePlayerTitle, this);
+    pViewUseSimplePlayer->setCheckable(true);
+    pViewUseSimplePlayer->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+            ConfigKey("[KeyboardShortcuts]", "ViewMenu_useSimplePlayer"),
+            tr("Ctrl+2", "Menubar|View|Simple Player Section"))));
+    pViewUseSimplePlayer->setStatusTip(useSimplePlayerText);
+    pViewUseSimplePlayer->setWhatsThis(buildWhatsThis(useSimplePlayerTitle, useSimplePlayerText));
+    createVisibilityControl(pViewUseSimplePlayer, ConfigKey("[Master]", "use_simpleplayer"));
+    pViewMenu->addAction(pViewUseSimplePlayer);
+
 #ifdef __VINYLCONTROL__
     QString showVinylControlTitle = tr("Show Vinyl Control Section");
     QString showVinylControlText = tr("Show the vinyl control section of the Mixxx interface.") +
@@ -279,11 +292,128 @@ void WMainMenuBar::initialize() {
     pViewMaximizeLibrary->setShortcut(
         QKeySequence(m_pKbdConfig->getValue(
                 ConfigKey("[KeyboardShortcuts]", "ViewMenu_MaximizeLibrary"),
-                tr("Space", "Menubar|View|Maximize Library"))));
+                tr("Tab", "Menubar|View|Maximize Library"))));
     pViewMaximizeLibrary->setStatusTip(maximizeLibraryText);
     pViewMaximizeLibrary->setWhatsThis(buildWhatsThis(maximizeLibraryTitle, maximizeLibraryText));
     createVisibilityControl(pViewMaximizeLibrary, ConfigKey("[Master]", "maximize_library"));
     pViewMenu->addAction(pViewMaximizeLibrary);
+
+    pViewMenu->addSeparator();
+
+    QString masterPlayPauseTitle = tr("Play/Pause");
+    QString masterPlayPauseText = tr("Master Play/Pause.");
+    auto* pViewMasterPlayPause = new QAction(masterPlayPauseTitle, this);
+    pViewMasterPlayPause->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterPlayPause"),   
+                tr("Shift+Space", "Menubar|View|Play/Pause"))));
+    pViewMasterPlayPause->setStatusTip(masterPlayPauseText);
+    pViewMasterPlayPause->setWhatsThis(buildWhatsThis(masterPlayPauseTitle, masterPlayPauseText));
+    createVisibilityControl(pViewMasterPlayPause, ConfigKey("[Master]", "playlist_playorpause"));
+    pViewMenu->addAction(pViewMasterPlayPause);
+
+    QString masterPlayTitle = tr("Play");
+    QString masterPlayText = tr("Play.");
+    auto* pViewMasterPlay = new QAction(masterPlayTitle, this);
+    pViewMasterPlay->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterPlay"),   
+                tr("x", "Menubar|View|Play"))));
+    pViewMasterPlay->setStatusTip(masterPlayText);
+    pViewMasterPlay->setWhatsThis(buildWhatsThis(masterPlayTitle, masterPlayText));
+    createVisibilityControl(pViewMasterPlay, ConfigKey("[Master]", "playlist_play"));
+    pViewMenu->addAction(pViewMasterPlay);
+
+    QString masterPauseTitle = tr("Pause");
+    QString masterPauseText = tr("Pause.");
+    auto* pViewMasterPause = new QAction(masterPauseTitle, this);
+    pViewMasterPause->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterPause"),   
+                tr("c", "Menubar|View|Pause"))));
+    pViewMasterPause->setStatusTip(masterPauseText);
+    pViewMasterPause->setWhatsThis(buildWhatsThis(masterPauseTitle, masterPauseText));
+    createVisibilityControl(pViewMasterPause, ConfigKey("[Master]", "playlist_pause"));
+    pViewMenu->addAction(pViewMasterPause);
+
+    QString masterStopTitle = tr("Stop");
+    QString masterStopText = tr("Stop.");
+    auto* pViewMasterStop = new QAction(masterStopTitle, this);
+    pViewMasterStop->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterStop"),   
+                tr("v", "Menubar|View|Stop"))));
+    pViewMasterStop->setStatusTip(masterStopText);
+    pViewMasterStop->setWhatsThis(buildWhatsThis(masterStopTitle, masterStopText));
+    createVisibilityControl(pViewMasterStop, ConfigKey("[Master]", "playlist_stop"));
+    pViewMenu->addAction(pViewMasterStop);
+
+    QString masterPrevTrackTitle = tr("Previous Track");
+    QString masterPrevTrackText = tr("Previous Track.");
+    auto* pViewMasterPrevTrack = new QAction(masterPrevTrackTitle, this);
+    pViewMasterPrevTrack->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterPrevTrack"),   
+                tr("z", "Menubar|View|Previous Track"))));
+    pViewMasterPrevTrack->setStatusTip(masterPrevTrackText);
+    pViewMasterPrevTrack->setWhatsThis(buildWhatsThis(masterPrevTrackTitle, masterPrevTrackText));
+    createVisibilityControl(pViewMasterPrevTrack, ConfigKey("[Master]", "playlist_prevtrack"));
+    pViewMenu->addAction(pViewMasterPrevTrack);
+
+    QString masterNextTrackTitle = tr("Next Track");
+    QString masterNextTrackText = tr("Next Track.");
+    auto* pViewMasterNextTrack = new QAction(masterNextTrackTitle, this);
+    pViewMasterNextTrack->setShortcut(
+        QKeySequence(m_pKbdConfig->getValue(
+                ConfigKey("[KeyboardShortcuts]", "ViewMenu_MasterNextTrack"),   
+                tr("b", "Menubar|View|Next Track"))));
+    pViewMasterNextTrack->setStatusTip(masterNextTrackText);
+    pViewMasterNextTrack->setWhatsThis(buildWhatsThis(masterNextTrackTitle, masterNextTrackText));
+    createVisibilityControl(pViewMasterNextTrack, ConfigKey("[Master]", "playlist_nexttrack"));
+    pViewMenu->addAction(pViewMasterNextTrack);
+
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_Space | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_playorpause"));
+        pViewMenu->addAction(pPlaceholder);
+    }
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_X | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_play"));
+        pViewMenu->addAction(pPlaceholder);
+    }
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_C | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_pause"));
+        pViewMenu->addAction(pPlaceholder);
+    }
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_V | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_stop"));
+        pViewMenu->addAction(pPlaceholder);
+    }
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_Z | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_prevtrack"));
+        pViewMenu->addAction(pPlaceholder);
+    }
+    {
+        auto* pPlaceholder = new QAction("Placeholder", this);
+        pPlaceholder->setShortcut(QKeySequence(Qt::Key_B | Qt::CTRL | Qt::SHIFT | Qt::ALT));
+        // pPlaceholder->setVisible(false);
+        createVisibilityControl(pPlaceholder, ConfigKey("[Master]", "playlist_nexttrack"));
+        pViewMenu->addAction(pPlaceholder);
+    }
 
     pViewMenu->addSeparator();
 
@@ -766,6 +896,7 @@ void VisibilityControlConnection::slotControlChanged() {
 
 void VisibilityControlConnection::slotActionToggled(bool toggle) {
     if (m_pControl) {
-        m_pControl->set(toggle ? 1.0 : 0.0);
+        double value = m_pAction->isCheckable() ? (toggle ? 1.0 : 0.0) : 1.0;
+        m_pControl->set(value);
     }
 }

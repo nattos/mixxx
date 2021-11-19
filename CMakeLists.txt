@@ -723,6 +723,7 @@ add_library(mixxx-lib STATIC EXCLUDE_FROM_ALL
   src/mixer/deck.cpp
   src/mixer/microphone.cpp
   src/mixer/playerinfo.cpp
+  src/mixer/nowplaying.mm
   src/mixer/playermanager.cpp
   src/mixer/previewdeck.cpp
   src/mixer/sampler.cpp
@@ -2204,6 +2205,7 @@ if(APPLE)
         "-weak_framework CoreMidi"
         "-weak_framework CoreServices"
         "-weak_framework CoreVideo"
+        "-weak_framework MediaPlayer"
         "-weak_framework IOSurface"
         "-weak_framework VideoToolbox"
     )

@@ -184,6 +184,7 @@ void BasePlaylistFeature::activateChild(const QModelIndex& index) {
         // like the year folder in the history feature
         return;
     }
+    emit willUnloadTrackModel(m_pPlaylistTableModel);
     m_pPlaylistTableModel->setTableModel(playlistId);
     emit showTrackModel(m_pPlaylistTableModel);
     emit enableCoverArtDisplay(true);
@@ -198,6 +199,7 @@ void BasePlaylistFeature::activatePlaylist(int playlistId) {
     VERIFY_OR_DEBUG_ASSERT(index.isValid()) {
         return;
     }
+    emit willUnloadTrackModel(m_pPlaylistTableModel);
     m_lastRightClickedIndex = index;
     m_pPlaylistTableModel->setTableModel(playlistId);
     emit showTrackModel(m_pPlaylistTableModel);
@@ -501,6 +503,7 @@ void BasePlaylistFeature::slotCreateImportPlaylist() {
 
         lastPlaylistId = m_playlistDao.createPlaylist(name);
         if (lastPlaylistId != kInvalidPlaylistId) {
+            emit willUnloadTrackModel(m_pPlaylistTableModel);
             m_pPlaylistTableModel->setTableModel(lastPlaylistId);
         } else {
             QMessageBox::warning(nullptr,
@@ -560,6 +563,7 @@ void BasePlaylistFeature::slotExportPlaylist() {
                     m_pLibrary->trackCollectionManager(),
                     "mixxx.db.model.playlist_export"));
 
+    emit willUnloadTrackModel(m_pPlaylistTableModel);
     pPlaylistTableModel->setTableModel(m_pPlaylistTableModel->getPlaylist());
     pPlaylistTableModel->setSort(
             pPlaylistTableModel->fieldIndex(
@@ -602,6 +606,7 @@ void BasePlaylistFeature::slotExportTrackFiles() {
                     m_pLibrary->trackCollectionManager(),
                     "mixxx.db.model.playlist_export"));
 
+    emit willUnloadTrackModel(m_pPlaylistTableModel);
     pPlaylistTableModel->setTableModel(m_pPlaylistTableModel->getPlaylist());
     pPlaylistTableModel->setSort(pPlaylistTableModel->fieldIndex(
                                          ColumnCache::COLUMN_PLAYLISTTRACKSTABLE_POSITION),

@@ -175,19 +175,21 @@ TEST_F(AnalyzerSilenceTest, RespectUserEdits) {
             mixxx::audio::FramePos::fromEngineSamplePos(
                     0.9 * nTrackSampleDataLength);
 
-    pTrack->setMainCuePosition(kManualCuePosition);
+    pTrack->setMainCuePosition(kManualCuePosition, true);
 
     CuePointer pIntroCue = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             kManualIntroPosition,
-            mixxx::audio::kInvalidFramePos);
+            mixxx::audio::kInvalidFramePos,
+            false);
 
     CuePointer pOutroCue = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             mixxx::audio::kInvalidFramePos,
-            kManualOutroPosition);
+            kManualOutroPosition,
+            true);
 
     // Fill the first half with silence
     for (int i = 0; i < nTrackSampleDataLength / 2; i++) {

@@ -46,6 +46,7 @@ QmlApplication::QmlApplication(
         qCritical() << "Error setting up sound devices" << result;
         exit(result);
     }
+    m_pCoreServices->getSoundManager()->closeDevices();
 
     // FIXME: DlgPreferences has some initialization logic that must be executed
     // before the GUI is shown, at least for the effects system.

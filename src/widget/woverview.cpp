@@ -87,6 +87,8 @@ WOverview::WOverview(
     m_pPassthroughControl->connectValueChanged(this, &WOverview::onPassthroughChange);
     m_bPassthroughEnabled = static_cast<bool>(m_pPassthroughControl->get());
 
+    m_pEditCuePoints = new ControlProxy("[Controls]", "AutoPersistCues");
+
     setAcceptDrops(true);
 
     setMouseTracking(true);
@@ -107,6 +109,16 @@ WOverview::WOverview(
     pPassthroughLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     pPassthroughLayout->addWidget(m_pPassthroughLabel);
     setLayout(pPassthroughLayout);
+}
+
+WOverview::~WOverview() {
+    delete m_endOfTrackControl;
+    delete m_pRateRatioControl;
+    delete m_trackSampleRateControl;
+    delete m_trackSamplesControl;
+    delete m_playpositionControl;
+    delete m_pPassthroughControl;
+    delete m_pEditCuePoints;
 }
 
 void WOverview::setup(const QDomNode& node, const SkinContext& context) {
@@ -539,8 +551,10 @@ void WOverview::mousePressEvent(QMouseEvent* e) {
                 }
             }
             if (pHoveredCue != nullptr) {
+                // TODO: Read persist cues from config.
+                bool isPersistCues = m_pEditCuePoints->get() != 0.;
                 if (e->modifiers().testFlag(Qt::ShiftModifier)) {
-                    m_pCurrentTrack->removeCue(pHoveredCue);
+                    m_pCurrentTrack->removeCue(pHoveredCue, isPersistCues);
                     return;
                 } else {
                     m_pCueMenuPopup->setTrackAndCue(m_pCurrentTrack, pHoveredCue);

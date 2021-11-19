@@ -1329,6 +1329,7 @@ WPushButton#PlayDeck,
 WPushButton#PreviewIndicator,
 WPushButton#PlayIndicator,
 WPushButton#CueDeck,
+WPushButton#CueDirty,
 #PlayCueMini WPushButton,
 WPushButton#LoopActivate,
 WPushButton#RateControls WPushButton,
@@ -1371,6 +1372,7 @@ WPushButton#LibExpand,
 #DeckRow_5_LoopCuesTransport WPushButton[displayValue="0"],
 #PlayCueMini WPushButton[displayValue="0"],
 WPushButton#CueDeck[displayValue="0"],
+WPushButton#CueDirty[displayValue="0"],
 WPushButton#PlayIndicator[value="0"],
 WPushButton#LoopActivate[displayValue="0"],
 #FxAssignButtons WPushButton[displayValue="0"],
@@ -1414,6 +1416,7 @@ WPushButton#PlayPreview[displayValue="1"],
 WPushButton#PlayIndicator[displayValue="1"],
 #LibraryPreviewButton:checked,
 #CueDeck[displayValue="1"],
+#CueDirty[displayValue="1"],
 WPushButton#Reverse[pressed="true"],
 #KeyControls WPushButton[pressed="true"],
 #LoopControls WPushButton[value="1"],
@@ -1605,6 +1608,10 @@ WPushButton#SamplerExpand[displayValue="0"],
 #CueDeck {
   image: url(skin:/classic/buttons/btn__cue_deck.svg) no-repeat center center;
 }
+
+#CueDirty {
+  image: url(skin:/classic/buttons/btn__beatjump_right.svg) no-repeat center center;
+  }
 
 #Reverse {
   image: url(skin:/classic/buttons/btn__reverse.svg) no-repeat center center;

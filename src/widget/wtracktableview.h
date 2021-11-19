@@ -95,6 +95,7 @@ class WTrackTableView : public WLibraryTableView {
 
     // Mouse move event, implemented to hide the text and show an icon instead
     // when dragging.
+    void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent *pEvent) override;
 
     // Returns the current TrackModel, or returns NULL if none is set.
@@ -113,6 +114,8 @@ class WTrackTableView : public WLibraryTableView {
     const double m_backgroundColorOpacity;
     QColor m_pFocusBorderColor;
     bool m_sorting;
+
+    QPoint m_mouseDownPoint;
 
     // Control the delay to load a cover art.
     mixxx::Duration m_lastUserAction;

@@ -101,7 +101,8 @@ void AnalyzerSilence::storeResults(TrackPointer pTrack) {
                 mixxx::CueType::AudibleSound,
                 Cue::kNoHotCue,
                 firstSoundPosition,
-                lastSoundPosition);
+                lastSoundPosition,
+                true);
     } else {
         // The user has no way to directly edit the AudibleSound cue. If the user
         // has deleted the Intro or Outro Cue, this analysis will be rerun when
@@ -125,7 +126,7 @@ void AnalyzerSilence::storeResults(TrackPointer pTrack) {
             (mainCuePosition == mixxx::audio::kStartFramePos &&
                     pIntroCue == nullptr);
     if (!mainCuePosition.isValid() || upgradingWithMainCueAtDefault) {
-        pTrack->setMainCuePosition(firstSoundPosition);
+        pTrack->setMainCuePosition(firstSoundPosition, true);
         // NOTE: the actual default for this ConfigValue is set in DlgPrefDeck.
     } else if (m_pConfig->getValue(ConfigKey("[Controls]", "SetIntroStartAtMainCue"), false) &&
             pIntroCue == nullptr) {
@@ -137,7 +138,8 @@ void AnalyzerSilence::storeResults(TrackPointer pTrack) {
                 mixxx::CueType::Intro,
                 Cue::kNoHotCue,
                 introStartPosition,
-                mixxx::audio::kInvalidFramePos);
+                mixxx::audio::kInvalidFramePos,
+                true);
     }
 
     CuePointer pOutroCue = pTrack->findCueByType(mixxx::CueType::Outro);
@@ -146,6 +148,7 @@ void AnalyzerSilence::storeResults(TrackPointer pTrack) {
                 mixxx::CueType::Outro,
                 Cue::kNoHotCue,
                 mixxx::audio::kInvalidFramePos,
-                lastSoundPosition);
+                lastSoundPosition,
+                true);
     }
 }

@@ -19,6 +19,7 @@
 
 class AnalysisFeature;
 class ControlObject;
+class ControlPushButton;
 class CrateFeature;
 class ExternalTrackCollection;
 class LibraryControl;
@@ -97,6 +98,8 @@ class Library: public QObject {
     void setRowHeight(int rowHeight);
     void setEditMedatataSelectedClick(bool enable);
 
+    TrackCursor makeTrackCursor(TrackPointer pTrack);
+
     /// Triggers a new search in the internal track collection
     /// and shows the results by switching the view.
     void searchTracksInCollection(const QString& query);
@@ -106,10 +109,13 @@ class Library: public QObject {
 #endif
 
   public slots:
+    void slotWillUnloadTrackModel(QAbstractItemModel* model);
     void slotShowTrackModel(QAbstractItemModel* model);
     void slotSwitchToView(const QString& view);
-    void slotLoadTrack(TrackPointer pTrack);
-    void slotLoadTrackToPlayer(TrackPointer pTrack, const QString& group, bool play);
+    void slotLoadTrackDirect(TrackPointer pTrack);
+    void slotLoadTrackToPlayerDirect(TrackPointer pTrack, const QString& group, bool play);
+    void slotLoadTrack(TrackCursor cursor);
+    void slotLoadTrackToPlayer(TrackCursor cursor, const QString& group, bool play);
     void slotLoadLocationToPlayer(const QString& location, const QString& group);
     void slotRefreshLibraryModels();
     void slotCreatePlaylist();
@@ -122,8 +128,8 @@ class Library: public QObject {
   signals:
     void showTrackModel(QAbstractItemModel* model);
     void switchToView(const QString& view);
-    void loadTrack(TrackPointer pTrack);
-    void loadTrackToPlayer(TrackPointer pTrack, const QString& group, bool play = false);
+    void loadTrack(TrackCursor cursor);
+    void loadTrackToPlayer(TrackCursor cursor, const QString& group, bool play = false);
     void restoreSearch(const QString&);
     void search(const QString& text);
     void disableSearch();
@@ -165,4 +171,11 @@ class Library: public QObject {
     int m_iTrackTableRowHeight;
     bool m_editMetadataSelectedClick;
     QScopedPointer<ControlObject> m_pKeyNotation;
+
+    TrackModel* m_pCurrentTrackModel;
+    int m_trackCursorEpoch;
+    QString m_trackCursorTrackModelKey;
+    bool m_trackCursorListCached;
+    QList<TrackId> m_trackCursorCachedList;
+    TrackModel* m_trackCursorCachedModel;
 };

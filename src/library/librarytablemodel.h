@@ -9,6 +9,8 @@ class LibraryTableModel : public BaseSqlTableModel {
                       const char* settingsNamespace);
     ~LibraryTableModel() override;
 
+    bool isModelGlobal() const override;
+
     void setTableModel();
 
     bool isColumnInternal(int column) final;

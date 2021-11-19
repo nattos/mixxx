@@ -39,6 +39,7 @@ class EngineChannel : public EngineObject {
     }
 
     virtual bool isActive() = 0;
+    bool isPlaying = false;
     void setPfl(bool enabled);
     virtual bool isPflEnabled() const;
     void setMaster(bool enabled);

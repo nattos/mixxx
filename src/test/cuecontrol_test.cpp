@@ -48,7 +48,7 @@ class CueControlTest : public BaseSignalPathTest {
     }
 
     void unloadTrack() {
-        m_pMixerDeck1->slotLoadTrack(TrackPointer(), false);
+        m_pMixerDeck1->slotLoadTrack(TrackCursor(), false);
     }
 
     mixxx::audio::FramePos getCurrentFramePos() {
@@ -88,17 +88,19 @@ TEST_F(CueControlTest, LoadUnloadTrack) {
     constexpr auto kOutroEndPosition = mixxx::audio::FramePos(300);
 
     TrackPointer pTrack = createTestTrack();
-    pTrack->setMainCuePosition(kCuePosition);
+    pTrack->setMainCuePosition(kCuePosition, false);
     auto pIntro = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             kIntroStartPosition,
-            kIntroEndPosition);
+            kIntroEndPosition,
+            false);
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             kOutroStartPosition,
-            kOutroEndPosition);
+            kOutroEndPosition,
+            false);
 
     loadTrack(pTrack);
 
@@ -130,17 +132,19 @@ TEST_F(CueControlTest, LoadTrackWithDetectedCues) {
     constexpr auto kOutroEndPosition = mixxx::audio::FramePos(200);
 
     TrackPointer pTrack = createTestTrack();
-    pTrack->setMainCuePosition(kCuePosition);
+    pTrack->setMainCuePosition(kCuePosition, false);
     auto pIntro = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             kCuePosition,
-            mixxx::audio::kInvalidFramePos);
+            mixxx::audio::kInvalidFramePos,
+            false);
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             mixxx::audio::kInvalidFramePos,
-            kOutroEndPosition);
+            kOutroEndPosition,
+            false);
 
     loadTrack(pTrack);
 
@@ -164,12 +168,14 @@ TEST_F(CueControlTest, LoadTrackWithIntroEndAndOutroStart) {
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             mixxx::audio::kInvalidFramePos,
-            kIntroEndPosition);
+            kIntroEndPosition,
+            false);
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             kOutroStartPosition,
-            mixxx::audio::kInvalidFramePos);
+            mixxx::audio::kInvalidFramePos,
+            false);
 
     loadTrack(pTrack);
 
@@ -203,19 +209,21 @@ TEST_F(CueControlTest, LoadAutodetectedCues_QuantizeEnabled) {
     const auto kOutroEndPosition = mixxx::audio::FramePos(15.5 * beatLengthFrames);
     const auto kQuantizedOutroEndPosition = mixxx::audio::FramePos(16.0 * beatLengthFrames);
 
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(1.9 * beatLengthFrames));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(1.9 * beatLengthFrames), false);
 
     auto pIntro = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             kIntroStartPosition,
-            kIntroEndPosition);
+            kIntroEndPosition,
+            false);
 
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             kOutroStartPosition,
-            kOutroEndPosition);
+            kOutroEndPosition,
+            false);
 
     loadTrack(pTrack);
 
@@ -233,19 +241,21 @@ TEST_F(CueControlTest, LoadAutodetectedCues_QuantizeEnabledNoBeats) {
     pTrack->trySetBpm(0.0);
 
     constexpr auto kCuePosition = mixxx::audio::FramePos(100);
-    pTrack->setMainCuePosition(kCuePosition);
+    pTrack->setMainCuePosition(kCuePosition, false);
 
     auto pIntro = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             mixxx::audio::FramePos(250.0),
-            mixxx::audio::FramePos(400.0));
+            mixxx::audio::FramePos(400.0),
+            false);
 
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             mixxx::audio::FramePos(550.0),
-            mixxx::audio::FramePos(800.0));
+            mixxx::audio::FramePos(800.0),
+            false);
 
     loadTrack(pTrack);
 
@@ -262,19 +272,21 @@ TEST_F(CueControlTest, LoadAutodetectedCues_QuantizeDisabled) {
     TrackPointer pTrack = createTestTrack();
     pTrack->trySetBpm(120.0);
 
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(240.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(240.0), false);
 
     auto pIntro = pTrack->createAndAddCue(
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             mixxx::audio::FramePos(210.0),
-            mixxx::audio::FramePos(330.0));
+            mixxx::audio::FramePos(330.0),
+            false);
 
     auto pOutro = pTrack->createAndAddCue(
             mixxx::CueType::Outro,
             Cue::kNoHotCue,
             mixxx::audio::FramePos(770.0),
-            mixxx::audio::FramePos(990.0));
+            mixxx::audio::FramePos(990.0),
+            false);
 
     loadTrack(pTrack);
 
@@ -292,7 +304,8 @@ TEST_F(CueControlTest, SeekOnLoadDefault) {
             mixxx::CueType::Intro,
             Cue::kNoHotCue,
             mixxx::audio::FramePos(250.0),
-            mixxx::audio::FramePos(400.0));
+            mixxx::audio::FramePos(400.0),
+            false);
 
     loadTrack(pTrack);
 
@@ -311,7 +324,7 @@ TEST_F(CueControlTest, SeekOnLoadMainCue) {
     EXPECT_FRAMEPOS_EQ(mixxx::audio::kStartFramePos, getCurrentFramePos());
 
     // Move cue like silence analysis does and check if track is following it
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(200.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(200.0), false);
     pTrack->analysisFinished();
     ProcessBuffer();
 
@@ -323,7 +336,7 @@ TEST_F(CueControlTest, DontSeekOnLoadMainCue) {
     config()->set(ConfigKey("[Controls]", "CueRecall"),
             ConfigValue(static_cast<int>(SeekOnLoadMode::MainCue)));
     TrackPointer pTrack = createTestTrack();
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(100.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(100.0), false);
 
     // The Track should not follow cue changes due to the analyzer if the
     // track has been manual seeked before.
@@ -336,7 +349,7 @@ TEST_F(CueControlTest, DontSeekOnLoadMainCue) {
     setCurrentFramePos(mixxx::audio::FramePos(200.0));
 
     // Move cue like silence analysis does and check if track is following it
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(400.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(400.0), false);
     pTrack->analysisFinished();
     ProcessBuffer();
 
@@ -348,7 +361,7 @@ TEST_F(CueControlTest, SeekOnLoadDefault_CueInPreroll) {
     config()->set(ConfigKey("[Controls]", "CueRecall"),
             ConfigValue(static_cast<int>(SeekOnLoadMode::MainCue)));
     TrackPointer pTrack = createTestTrack();
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(-100.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(-100.0), false);
 
     loadTrack(pTrack);
 
@@ -356,7 +369,7 @@ TEST_F(CueControlTest, SeekOnLoadDefault_CueInPreroll) {
     EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(-100.0), getCurrentFramePos());
 
     // Move cue like silence analysis does and check if track is following it
-    pTrack->setMainCuePosition(mixxx::audio::FramePos(-200.0));
+    pTrack->setMainCuePosition(mixxx::audio::FramePos(-200.0), false);
     pTrack->analysisFinished();
     ProcessBuffer();
 
@@ -375,7 +388,7 @@ TEST_F(CueControlTest, FollowCueOnQuantize) {
     const mixxx::audio::FrameDiff_t beatLengthFrames = (60.0 * sampleRate / bpm);
     const auto cuePos = mixxx::audio::FramePos(1.8 * beatLengthFrames);
     const auto quantizedCuePos = mixxx::audio::FramePos(2.0 * beatLengthFrames);
-    pTrack->setMainCuePosition(cuePos);
+    pTrack->setMainCuePosition(cuePos, false);
 
     loadTrack(pTrack);
 
@@ -414,7 +427,7 @@ TEST_F(CueControlTest, SeekOnSetCueCDJ) {
     const double bpm = pTrack->getBpm();
     const mixxx::audio::FrameDiff_t beatLengthFrames = (60.0 * sampleRate / bpm);
     const auto cuePos = mixxx::audio::FramePos(10 * beatLengthFrames);
-    pTrack->setMainCuePosition(cuePos);
+    pTrack->setMainCuePosition(cuePos, false);
 
     loadTrack(pTrack);
 
@@ -444,7 +457,7 @@ TEST_F(CueControlTest, SeekOnSetCuePlay) {
     const double bpm = pTrack->getBpm();
     const mixxx::audio::FrameDiff_t beatLengthFrames = (60.0 * sampleRate / bpm);
     const auto cuePos = mixxx::audio::FramePos(10 * beatLengthFrames);
-    pTrack->setMainCuePosition(cuePos);
+    pTrack->setMainCuePosition(cuePos, false);
 
     loadTrack(pTrack);
 

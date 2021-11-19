@@ -882,7 +882,8 @@ void setHotCue(TrackPointer track,
                 type,
                 id,
                 startPosition,
-                endPosition);
+                endPosition,
+                false);
     }
     pCue->setLabel(label);
     if (color) {
@@ -1103,7 +1104,7 @@ void readAnalyze(TrackPointer track,
 
             if (!mainCueFound && !memoryCueOrLoop.endPosition.isValid()) {
                 // Set first chronological memory cue as Mixxx MainCue
-                track->setMainCuePosition(memoryCueOrLoop.startPosition);
+                track->setMainCuePosition(memoryCueOrLoop.startPosition, false);
                 CuePointer pMainCue = track->findCueByType(mixxx::CueType::MainCue);
                 pMainCue->setLabel(memoryCueOrLoop.comment);
                 pMainCue->setColor(*memoryCueOrLoop.color);

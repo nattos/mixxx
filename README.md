@@ -10,6 +10,24 @@
 [Mixxx] is Free DJ software that gives you everything you need to perform live
 DJ mixes. Mixxx works on GNU/Linux, Windows, and macOS.
 
+## Fork TL;DR
+
+Basic premise:
+
+- Make mixxx usable as an any situation everyday music player
+
+More detailed changes:
+
+1. Stopped process from preventing machine from sleeping when not playing
+1. Stopped processing after decks stop playing to save on CPU
+1. Introduced next and previous track buttons
+1. Added an option to stop writing out changes to cue points all the time
+1. Supported "Default audio device"
+1. Supported default audio device changing
+1. Support macos "Now Playing" and media keys
+1. Fixed some drag and drop issues
+1. Added a config option to set preferred analyzed BPM range
+
 ## Quick Start
 
 To get started with Mixxx:

@@ -1436,7 +1436,7 @@ class RemoveCuesOfTypeTrackPointerOperation : public mixxx::TrackPointerOperatio
   private:
     void doApply(
             const TrackPointer& pTrack) const override {
-        pTrack->removeCuesOfType(m_cueType);
+        pTrack->removeCuesOfType(m_cueType, true);
     }
 
     const mixxx::CueType m_cueType;

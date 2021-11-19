@@ -74,6 +74,9 @@ PositionScratchController::PositionScratchController(const QString& group)
           m_dMoveDelay(0),
           m_dMouseSampeTime(0) {
     m_pScratchEnable = new ControlObject(ConfigKey(group, "scratch_position_enable"));
+    connect(m_pScratchEnable, &ControlObject::valueChanged,
+            this, &PositionScratchController::slotScratchEnable,
+            Qt::DirectConnection);
     m_pScratchPosition = new ControlObject(ConfigKey(group, "scratch_position"));
     m_pMasterSampleRate = ControlObject::getControl(ConfigKey("[Master]", "samplerate"));
     m_pVelocityController = new VelocityController();
@@ -91,8 +94,16 @@ PositionScratchController::~PositionScratchController() {
 //volatile double _d = -0.15;
 //volatile double _f = 0.5;
 
+void PositionScratchController::slotScratchEnable(double v) {
+    if (v == 0.) {
+        return;
+    }
+    emit engineWakeRequested();
+}
+
 void PositionScratchController::process(double currentSample, double releaseRate,
         int iBufferSize, double baserate) {
+    // TODO: Have this call EngineMaster.requestAwake properly.
     bool scratchEnable = m_pScratchEnable->get() != 0;
 
     if (!m_bScratching && !scratchEnable) {

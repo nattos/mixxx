@@ -297,9 +297,9 @@ class Track : public QObject {
     /// Get the track's main cue point
     mixxx::audio::FramePos getMainCuePosition() const;
     // Set the track's main cue point
-    void setMainCuePosition(mixxx::audio::FramePos position);
+    void setMainCuePosition(mixxx::audio::FramePos position, bool persist);
     /// Shift all cues by a constant offset
-    void shiftCuePositionsMillis(mixxx::audio::FrameDiff_t milliseconds);
+    void shiftCuePositionsMillis(mixxx::audio::FrameDiff_t milliseconds, bool persist);
     // Call when analysis is done.
     void analysisFinished();
 
@@ -308,29 +308,34 @@ class Track : public QObject {
             mixxx::CueType type,
             int hotCueIndex,
             mixxx::audio::FramePos startPosition,
-            mixxx::audio::FramePos endPosition);
+            mixxx::audio::FramePos endPosition,
+            bool persist);
     CuePointer createAndAddCue(
             mixxx::CueType type,
             int hotCueIndex,
             double startPositionSamples,
-            double endPositionSamples) {
+            double endPositionSamples,
+            bool persist) {
         return createAndAddCue(type,
                 hotCueIndex,
                 mixxx::audio::FramePos::fromEngineSamplePosMaybeInvalid(
                         startPositionSamples),
                 mixxx::audio::FramePos::fromEngineSamplePosMaybeInvalid(
-                        endPositionSamples));
+                        endPositionSamples),
+                persist);
     }
     CuePointer findCueByType(mixxx::CueType type) const; // NOTE: Cannot be used for hotcues.
     CuePointer findCueById(DbId id) const;
-    void removeCue(const CuePointer& pCue);
-    void removeCuesOfType(mixxx::CueType);
+    void removeCue(const CuePointer& pCue, bool persist);
+    void removeCuesOfType(mixxx::CueType, bool persist);
     QList<CuePointer> getCuePoints() const {
         // Copying implicitly shared collections is thread-safe
         return m_cuePoints;
     }
 
-    void setCuePoints(const QList<CuePointer>& cuePoints);
+    void setCuePoints(const QList<CuePointer>& cuePoints, bool persist);
+    bool isSaveCuePoints() const { return m_saveCuePoints; }
+    void setSaveCuePoints(bool value);
 
     enum class ImportStatus {
         Pending,
@@ -452,6 +457,7 @@ class Track : public QObject {
     void replayGainAdjusted(const mixxx::ReplayGain&);
     void colorUpdated(const mixxx::RgbColor::optional_t& color);
     void cuesUpdated();
+    void saveCuePointsChanged(bool);
     void analyzed();
 
     void changed(TrackId trackId);
@@ -566,6 +572,7 @@ class Track : public QObject {
 
     // The list of cue points for the track
     QList<CuePointer> m_cuePoints;
+    bool m_saveCuePoints;
 
     // Storage for the track's beats
     mixxx::BeatsPointer m_pBeats;

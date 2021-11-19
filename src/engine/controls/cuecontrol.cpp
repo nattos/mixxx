@@ -157,6 +157,12 @@ CueControl::CueControl(const QString& group,
             this, &CueControl::cueDefault,
             Qt::DirectConnection);
 
+    m_pCueDirty = new ControlPushButton(ConfigKey(group, "cue_dirty"));
+    m_pCueDirty->setButtonMode(ControlPushButton::TOGGLE);
+    m_pCueDirty->connectValueChangeRequest(this, &CueControl::slotCueDirtyChangeRequest);
+
+    m_pEditCuePoints = new ControlProxy("[Controls]", "AutoPersistCues");
+
     m_pPlayStutter = new ControlPushButton(ConfigKey(group, "play_stutter"));
     connect(m_pPlayStutter, &ControlObject::valueChanged,
             this, &CueControl::playStutter,
@@ -283,8 +289,10 @@ CueControl::~CueControl() {
     delete m_pCuePlay;
     delete m_pCueGotoAndStop;
     delete m_pCuePreview;
+    delete m_pEditCuePoints;
     delete m_pCueCDJ;
     delete m_pCueDefault;
+    delete m_pCueDirty;
     delete m_pPlayStutter;
     delete m_pCueIndicator;
     delete m_pPlayIndicator;
@@ -435,6 +443,7 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
         setHotcueFocusIndex(Cue::kNoHotCue);
         m_pLoadedTrack.reset();
         m_usedSeekOnLoadPosition.setValue(mixxx::audio::kStartFramePos);
+        m_pCueDirty->forceSet(false);
     }
 
     if (!pNewTrack) {
@@ -453,6 +462,13 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
             this,
             &CueControl::trackCuesUpdated,
             Qt::DirectConnection);
+
+    m_pCueDirty->forceSet(m_pLoadedTrack->isSaveCuePoints() != 0.);
+    connect(m_pLoadedTrack.get(),
+            &Track::saveCuePointsChanged,
+            this,
+            &CueControl::slotTrackSaveCuePointsChanged,
+            Qt::DirectConnection);
     lock.unlock();
 
     // Use pNewTrack from now, because m_pLoadedTrack might have been reset
@@ -461,6 +477,13 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
     // Update COs with cues from track.
     loadCuesFromTrack();
 
+    seekToSeekOnLoadPosition();
+}
+
+void CueControl::seekToSeekOnLoadPosition() {
+    if (!m_pLoadedTrack) {
+        return;
+    }
     // Seek track according to SeekOnLoadMode.
     SeekOnLoadMode seekOnLoadMode = getSeekOnLoadPreference();
 
@@ -474,7 +497,7 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
         break;
     case SeekOnLoadMode::FirstSound: {
         CuePointer pAudibleSound =
-                pNewTrack->findCueByType(mixxx::CueType::AudibleSound);
+                m_pLoadedTrack->findCueByType(mixxx::CueType::AudibleSound);
         mixxx::audio::FramePos audibleSoundPosition = mixxx::audio::kInvalidFramePos;
         if (pAudibleSound) {
             audibleSoundPosition = pAudibleSound->getPosition();
@@ -638,7 +661,7 @@ void CueControl::loadCuesFromTrack() {
     if (pMainCue) {
         mainCuePosition = pMainCue->getPosition();
         // adjust the track cue accordingly
-        m_pLoadedTrack->setMainCuePosition(mainCuePosition);
+        m_pLoadedTrack->setMainCuePosition(mainCuePosition, false);
     } else {
         // If no load cue point is stored, read from track
         // Note: This is mixxx::audio::kStartFramePos for new tracks
@@ -657,7 +680,8 @@ void CueControl::loadCuesFromTrack() {
                     mixxx::CueType::MainCue,
                     Cue::kNoHotCue,
                     mainCuePosition,
-                    mixxx::audio::kInvalidFramePos);
+                    mixxx::audio::kInvalidFramePos,
+                    false);
         }
     }
 
@@ -815,11 +839,14 @@ void CueControl::hotcueSet(HotcueControl* pControl, double value, HotcueSetMode 
 
     int hotcueIndex = pControl->getHotcueIndex();
 
+    // TODO: Read persist cues from config.
+    bool isPersistCues = m_pEditCuePoints->get() != 0.;
     CuePointer pCue = m_pLoadedTrack->createAndAddCue(
             cueType,
             hotcueIndex,
             cueStartPosition,
-            cueEndPosition);
+            cueEndPosition,
+            isPersistCues);
 
     // TODO(XXX) deal with spurious signals
     attachCue(pCue, pControl);
@@ -1099,7 +1126,9 @@ void CueControl::hotcueClear(HotcueControl* pControl, double value) {
         return;
     }
     detachCue(pControl);
-    m_pLoadedTrack->removeCue(pCue);
+    // TODO: Read persist cues from config.
+    bool isPersistCues = m_pEditCuePoints->get() != 0.;
+    m_pLoadedTrack->removeCue(pCue, isPersistCues);
     setHotcueFocusIndex(Cue::kNoHotCue);
 }
 
@@ -1201,7 +1230,9 @@ void CueControl::cueSet(double value) {
     // The m_pCuePoint CO is set via loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
-        pLoadedTrack->setMainCuePosition(position);
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
+        pLoadedTrack->setMainCuePosition(position, isPersistCues);
     }
 }
 
@@ -1214,8 +1245,14 @@ void CueControl::cueClear(double value) {
     // no locking required
     TrackPointer pLoadedTrack = m_pLoadedTrack;
     if (pLoadedTrack) {
-        pLoadedTrack->setMainCuePosition(mixxx::audio::kStartFramePos);
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
+        pLoadedTrack->setMainCuePosition(mixxx::audio::kStartFramePos, isPersistCues);
     }
+}
+
+void CueControl::seekToCuePoint() {
+    cueGoto(1.);
 }
 
 void CueControl::cueGoto(double value) {
@@ -1468,6 +1505,18 @@ void CueControl::cueDefault(double v) {
     }
 }
 
+void CueControl::slotCueDirtyChangeRequest(double v) {
+    qDebug() << "CueControl::slotCueDirtyChangeRequest:" <<  v;
+    if (m_pLoadedTrack) {
+        m_pLoadedTrack->setSaveCuePoints(v != 0.);
+    }
+}
+
+void CueControl::slotTrackSaveCuePointsChanged(bool v) {
+    qDebug() << "CueControl::slotTrackSaveCuePointsChanged:" <<  v;
+    m_pCueDirty->setAndConfirm(v);
+}
+
 void CueControl::pause(double v) {
     auto lock = lockMutex(&m_trackMutex);
     //qDebug() << "CueControl::pause()" << v;
@@ -1540,15 +1589,21 @@ void CueControl::introStartSet(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Intro);
         if (!pCue) {
             pCue = pLoadedTrack->createAndAddCue(
                     mixxx::CueType::Intro,
                     Cue::kNoHotCue,
                     position,
-                    introEnd);
+                    introEnd,
+                    isPersistCues);
         } else {
             pCue->setStartAndEndPosition(position, introEnd);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         }
     }
 }
@@ -1569,12 +1624,17 @@ void CueControl::introStartClear(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Intro);
         if (introEndPosition.isValid()) {
             pCue->setStartPosition(mixxx::audio::kInvalidFramePos);
             pCue->setEndPosition(introEndPosition);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+            pLoadedTrack->removeCue(pCue, isPersistCues);
         }
     }
 }
@@ -1641,14 +1701,20 @@ void CueControl::introEndSet(double value) {
     // this can be done outside the locking scope
     if (pLoadedTrack) {
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Intro);
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         if (!pCue) {
             pCue = pLoadedTrack->createAndAddCue(
                     mixxx::CueType::Intro,
                     Cue::kNoHotCue,
                     introStart,
-                    position);
+                    position,
+                    isPersistCues);
         } else {
             pCue->setStartAndEndPosition(introStart, position);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         }
     }
 }
@@ -1669,12 +1735,17 @@ void CueControl::introEndClear(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Intro);
         if (introStart.isValid()) {
             pCue->setStartPosition(introStart);
             pCue->setEndPosition(mixxx::audio::kInvalidFramePos);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+            pLoadedTrack->removeCue(pCue, isPersistCues);
         }
     }
 }
@@ -1743,15 +1814,21 @@ void CueControl::outroStartSet(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Outro);
         if (!pCue) {
             pCue = pLoadedTrack->createAndAddCue(
                     mixxx::CueType::Outro,
                     Cue::kNoHotCue,
                     position,
-                    outroEnd);
+                    outroEnd,
+                    isPersistCues);
         } else {
             pCue->setStartAndEndPosition(position, outroEnd);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         }
     }
 }
@@ -1772,12 +1849,17 @@ void CueControl::outroStartClear(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Outro);
         if (outroEnd.isValid()) {
             pCue->setStartPosition(mixxx::audio::kInvalidFramePos);
             pCue->setEndPosition(outroEnd);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+            pLoadedTrack->removeCue(pCue, isPersistCues);
         }
     }
 }
@@ -1846,15 +1928,21 @@ void CueControl::outroEndSet(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Outro);
         if (!pCue) {
             pCue = pLoadedTrack->createAndAddCue(
                     mixxx::CueType::Outro,
                     Cue::kNoHotCue,
                     outroStart,
-                    position);
+                    position,
+                    isPersistCues);
         } else {
             pCue->setStartAndEndPosition(outroStart, position);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         }
     }
 }
@@ -1875,12 +1963,17 @@ void CueControl::outroEndClear(double value) {
     // CO's are updated in loadCuesFromTrack()
     // this can be done outside the locking scope
     if (pLoadedTrack) {
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         CuePointer pCue = pLoadedTrack->findCueByType(mixxx::CueType::Outro);
         if (outroStart.isValid()) {
             pCue->setStartPosition(outroStart);
             pCue->setEndPosition(mixxx::audio::kInvalidFramePos);
+            if (isPersistCues) {
+                pLoadedTrack->setSaveCuePoints(true);
+            }
         } else if (pCue) {
-            pLoadedTrack->removeCue(pCue);
+            pLoadedTrack->removeCue(pCue, isPersistCues);
         }
     }
 }

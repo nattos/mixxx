@@ -623,6 +623,12 @@ Description:
                 <SetVariable name="Setting">[Library],show_coverart</SetVariable>
               </Template>
 
+              <Template src="skin:/helpers/skin_settings_button_2state.xml">
+                <SetVariable name="TooltipId">edit_cuepoints</SetVariable>
+                <SetVariable name="Text">Edit Cue Points</SetVariable>
+                <SetVariable name="Setting">[Controls],AutoPersistCues</SetVariable>
+              </Template>
+
             </Children>
           </WidgetGroup><!-- /Library -->
 

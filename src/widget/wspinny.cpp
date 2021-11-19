@@ -88,10 +88,10 @@ WSpinny::WSpinny(
     }
 
     if (m_pPlayer != nullptr) {
-        connect(m_pPlayer, &BaseTrackPlayer::newTrackLoaded, this, &WSpinny::slotLoadTrack);
+        connect(m_pPlayer, &BaseTrackPlayer::newTrackLoaded, this, &WSpinny::slotLoadTrackDirect);
         connect(m_pPlayer, &BaseTrackPlayer::loadingTrack, this, &WSpinny::slotLoadingTrack);
         // just in case a track is already loaded
-        slotLoadTrack(m_pPlayer->getLoadedTrack());
+        handleLoadTrack(m_pPlayer->getLoadedTrack());
     }
 
     connect(m_pCoverMenu, &WCoverArtMenu::coverInfoSelected, this, &WSpinny::slotCoverInfoSelected);
@@ -234,7 +234,15 @@ void WSpinny::setup(const QDomNode& node, const SkinContext& context) {
 #endif
 }
 
-void WSpinny::slotLoadTrack(TrackPointer pTrack) {
+void WSpinny::slotLoadTrack(TrackCursor cursor) {
+    handleLoadTrack(cursor.Track);
+}
+
+void WSpinny::slotLoadTrackDirect(TrackPointer pTrack) {
+    handleLoadTrack(pTrack);
+}
+
+void WSpinny::handleLoadTrack(TrackPointer pTrack) {
     if (m_loadedTrack) {
         disconnect(m_loadedTrack.get(),
                 &Track::coverArtUpdated,

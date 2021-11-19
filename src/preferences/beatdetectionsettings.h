@@ -14,6 +14,8 @@
 // BPM_CONFIG_KEY Preferences
 #define BPM_DETECTION_ENABLED "BPMDetectionEnabled"
 #define BPM_FIXED_TEMPO_ASSUMPTION "BeatDetectionFixedTempoAssumption"
+#define BPM_DETECTION_PREFERRED_MIN_BPM "BPMDetectionPreferredMinBpm"
+#define BPM_DETECTION_PREFERRED_MAX_BPM "BPMDetectionPreferredMaxBpm"
 #define BPM_REANALYZE_WHEN_SETTINGS_CHANGE "ReanalyzeWhenSettingsChange"
 #define BPM_REANALYZE_IMPORTED "ReanalyzeImported"
 #define BPM_FAST_ANALYSIS_ENABLED "FastAnalysisEnabled"
@@ -27,6 +29,12 @@ class BeatDetectionSettings {
 
     DEFINE_PREFERENCE_HELPERS(FixedTempoAssumption, bool,
                               BPM_CONFIG_KEY, BPM_FIXED_TEMPO_ASSUMPTION, true);
+
+    DEFINE_PREFERENCE_HELPERS(BpmDetectionPreferredMinBpm, int,
+                              BPM_CONFIG_KEY, BPM_DETECTION_PREFERRED_MIN_BPM, 88);
+
+    DEFINE_PREFERENCE_HELPERS(BpmDetectionPreferredMaxBpm, int,
+                              BPM_CONFIG_KEY, BPM_DETECTION_PREFERRED_MAX_BPM, 175);
 
     DEFINE_PREFERENCE_HELPERS(ReanalyzeWhenSettingsChange, bool,
                               BPM_CONFIG_KEY, BPM_REANALYZE_WHEN_SETTINGS_CHANGE, false);

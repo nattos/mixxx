@@ -3,6 +3,7 @@
 #include "moc_vinylcontrolcontrol.cpp"
 #include "track/track.h"
 #include "vinylcontrol/vinylcontrol.h"
+#include "engine/enginemaster.h"
 
 VinylControlControl::VinylControlControl(const QString& group, UserSettingsPointer pConfig)
         : EngineControl(group, pConfig),
@@ -89,6 +90,8 @@ void VinylControlControl::slotControlVinylSeek(double fractionalPos) {
     if (!pTrack || !info.trackEndPosition.isValid()) {
         return;
     }
+
+    getEngineMaster()->requestAwake();
 
     const auto newPlayPos = mixxx::audio::kStartFramePos +
             (info.trackEndPosition - mixxx::audio::kStartFramePos) * fractionalPos;

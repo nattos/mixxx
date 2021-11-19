@@ -51,4 +51,7 @@ class DragAndDropHelper final {
             TrackDropTarget& target,
             const QString& group,
             UserSettingsPointer pConfig);
+
+    static bool hasUrls(const QMimeData* mimeData);
+    static QList<QUrl> getUrls(const QMimeData* mimeData);
 };

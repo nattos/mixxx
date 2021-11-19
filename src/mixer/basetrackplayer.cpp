@@ -65,6 +65,8 @@ BaseTrackPlayerImpl::BaseTrackPlayerImpl(
     m_pVinylControlStatus = make_parented<ControlProxy>(getGroup(), "vinylcontrol_status", this);
 #endif
 
+    m_pUseSimplePlayer = make_parented<ControlProxy>("[Master]", "use_simpleplayer", this);
+
     EngineBuffer* pEngineBuffer = m_pChannel->getEngineBuffer();
     pMixingEngine->addChannel(m_pChannel);
 
@@ -80,6 +82,7 @@ BaseTrackPlayerImpl::BaseTrackPlayerImpl(
             &EngineBuffer::trackLoadFailed,
             this,
             &BaseTrackPlayerImpl::slotLoadFailed);
+    connect(pEngineBuffer, &EngineBuffer::trackWantsLoadNextTrack, this, &BaseTrackPlayerImpl::slotLoadNextTrack);
 
     // Get loop point control objects
     m_pLoopInPoint = make_parented<ControlProxy>(
@@ -182,6 +185,8 @@ BaseTrackPlayerImpl::BaseTrackPlayerImpl(
             this,
             &BaseTrackPlayerImpl::slotShiftCuesMillis);
 
+    m_pEditCuePoints = make_parented<ControlProxy>("[Controls]", "AutoPersistCues", this);
+
     // BPM of the current song
     m_pFileBPM = std::make_unique<ControlObject>(ConfigKey(getGroup(), "file_bpm"));
     m_pKey = make_parented<ControlProxy>(getGroup(), "file_key", this);
@@ -216,6 +221,7 @@ TrackPointer BaseTrackPlayerImpl::loadFakeTrack(bool bPlay, double filebpm) {
 
     TrackPointer pOldTrack = m_pLoadedTrack;
     m_pLoadedTrack = pTrack;
+    m_loadedTrackCursor = TrackCursor { .Track = pTrack };
     if (m_pLoadedTrack) {
         // Listen for updates to the file's BPM
         connectLoadedTrack();
@@ -231,10 +237,12 @@ TrackPointer BaseTrackPlayerImpl::loadFakeTrack(bool bPlay, double filebpm) {
     return pTrack;
 }
 
-void BaseTrackPlayerImpl::loadTrack(TrackPointer pTrack) {
+void BaseTrackPlayerImpl::loadTrack(TrackCursor cursor) {
     DEBUG_ASSERT(!m_pLoadedTrack);
 
+    TrackPointer pTrack = cursor.Track;
     m_pLoadedTrack = std::move(pTrack);
+    m_loadedTrackCursor = cursor;
     if (!m_pLoadedTrack) {
         // nothing to
         return;
@@ -322,14 +330,20 @@ TrackPointer BaseTrackPlayerImpl::unloadTrack() {
                 break;
             }
         }
+        // TODO: Read persist cues from config.
+        bool isPersistCues = m_pEditCuePoints->get() != 0.;
         if (pLoopCue) {
             pLoopCue->setStartAndEndPosition(loopStart, loopEnd);
+            if (isPersistCues) {
+                m_pLoadedTrack->setSaveCuePoints(true);
+            }
         } else {
             pLoopCue = m_pLoadedTrack->createAndAddCue(
                     mixxx::CueType::Loop,
                     Cue::kNoHotCue,
                     loopStart,
-                    loopEnd);
+                    loopEnd,
+                    isPersistCues);
         }
     }
 
@@ -381,6 +395,8 @@ void BaseTrackPlayerImpl::connectLoadedTrack() {
             &Track::colorUpdated,
             this,
             &BaseTrackPlayerImpl::slotSetTrackColor);
+
+    m_pEngineMaster->requestAwake();
 }
 
 void BaseTrackPlayerImpl::disconnectLoadedTrack() {
@@ -392,7 +408,18 @@ void BaseTrackPlayerImpl::disconnectLoadedTrack() {
     disconnect(m_pLoadedTrack.get(), nullptr, m_pKey.get(), nullptr);
 }
 
-void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack, bool bPlay) {
+void BaseTrackPlayerImpl::seekToCuePoint() {
+    EngineBuffer* pEngineBuffer = m_pChannel->getEngineBuffer();
+    pEngineBuffer->seekToCuePoint();
+}
+
+void BaseTrackPlayerImpl::seekToSeekOnLoadPosition() {
+    EngineBuffer* pEngineBuffer = m_pChannel->getEngineBuffer();
+    pEngineBuffer->seekToSeekOnLoadPosition();
+}
+
+void BaseTrackPlayerImpl::slotLoadTrack(TrackCursor cursor, bool bPlay) {
+    TrackPointer pNewTrack = cursor.Track;
     //qDebug() << "BaseTrackPlayerImpl::slotLoadTrack" << getGroup() << pNewTrack.get();
     // Before loading the track, ensure we have access. This uses lazy
     // evaluation to make sure track isn't NULL before we dereference it.
@@ -406,7 +433,7 @@ void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack, bool bPlay) {
 
     auto pOldTrack = unloadTrack();
 
-    loadTrack(pNewTrack);
+    loadTrack(cursor);
 
     // await slotTrackLoaded()/slotLoadFailed()
     // emit this before pEngineBuffer->loadTrack() to avoid receiving
@@ -415,7 +442,14 @@ void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack, bool bPlay) {
 
     // Request a new track from EngineBuffer
     EngineBuffer* pEngineBuffer = m_pChannel->getEngineBuffer();
-    pEngineBuffer->loadTrack(pNewTrack, bPlay);
+    pEngineBuffer->loadTrack(cursor, bPlay);
+}
+
+void BaseTrackPlayerImpl::slotLoadNextTrack(TrackCursor cursor) {
+    if (!cursor.GetTrackWithOffset) {
+        return;
+    }
+    slotLoadTrack(cursor.GetTrackWithOffset(cursor, 1), true);
 }
 
 void BaseTrackPlayerImpl::slotLoadFailed(TrackPointer pTrack, const QString& reason) {
@@ -433,8 +467,28 @@ void BaseTrackPlayerImpl::slotLoadFailed(TrackPointer pTrack, const QString& rea
         qDebug() << "Failed to load track (NULL track object)" << reason;
     }
     m_pChannelToCloneFrom = nullptr;
-    // Alert user.
-    QMessageBox::warning(nullptr, tr("Couldn't load track."), reason);
+
+    bool isSimplePlayer = m_pUseSimplePlayer->get() != 0.;
+    if (isSimplePlayer) {
+        TrackCursor cursor = m_loadedTrackCursor;
+        if (!cursor.GetTrackWithOffset) {
+            return;
+        }
+        int offset = cursor.LastTrackOffset;
+        if (offset == 0) {
+            offset = 1;
+        }
+        // Delay invocation so we don't endlessly try playing errored tracks.
+        // Note: This behaves badly when hammering UI buttons.
+        QTimer::singleShot(1, this, [this, cursor, offset, pTrack] {
+            if (!m_pLoadedTrack) {
+                slotLoadTrack(cursor.GetTrackWithOffset(cursor, offset), true);
+            }
+        });
+    } else {
+        // Alert user.
+        QMessageBox::warning(nullptr, tr("Couldn't load track."), reason);
+    }
 }
 
 void BaseTrackPlayerImpl::slotTrackLoaded(TrackPointer pNewTrack,
@@ -556,6 +610,10 @@ TrackPointer BaseTrackPlayerImpl::getLoadedTrack() const {
     return m_pLoadedTrack;
 }
 
+TrackCursor BaseTrackPlayerImpl::getLoadedTrackCursor() const {
+    return m_loadedTrackCursor;
+}
+
 void BaseTrackPlayerImpl::slotCloneDeck() {
     Syncable* syncable = m_pEngineMaster->getEngineSync()->pickNonSyncSyncTarget(m_pChannel);
     if (syncable) {
@@ -599,13 +657,13 @@ void BaseTrackPlayerImpl::slotCloneChannel(EngineChannel* pChannel) {
         return;
     }
 
-    TrackPointer pTrack = m_pChannelToCloneFrom->getEngineBuffer()->getLoadedTrack();
-    if (!pTrack) {
+    TrackCursor cursor = m_pChannelToCloneFrom->getEngineBuffer()->getLoadedTrackCursor();
+    if (!cursor.Track) {
         m_pChannelToCloneFrom = nullptr;
         return;
     }
 
-    slotLoadTrack(pTrack, false);
+    slotLoadTrack(cursor, false);
 }
 
 void BaseTrackPlayerImpl::slotSetReplayGain(mixxx::ReplayGain replayGain) {
@@ -659,6 +717,7 @@ void BaseTrackPlayerImpl::slotPlayToggled(double value) {
     if (value == 0 && m_replaygainPending) {
         setReplayGain(m_pLoadedTrack->getReplayGain().getRatio());
     }
+    emit playChanged();
 }
 
 EngineDeck* BaseTrackPlayerImpl::getEngineDeck() const {
@@ -729,7 +788,9 @@ void BaseTrackPlayerImpl::slotShiftCuesMillis(double milliseconds) {
     if (!m_pLoadedTrack) {
         return;
     }
-    m_pLoadedTrack->shiftCuePositionsMillis(milliseconds);
+    // TODO: Read persist cues from config.
+    bool isPersistCues = m_pEditCuePoints->get() != 0.;
+    m_pLoadedTrack->shiftCuePositionsMillis(milliseconds, isPersistCues);
 }
 
 void BaseTrackPlayerImpl::slotShiftCuesMillisButton(double value, double milliseconds) {

@@ -83,6 +83,40 @@
           <WidgetGroup>
             <SizePolicy>me,min</SizePolicy>
             <MinimumSize>2,</MinimumSize>
+            <MaximumSize>8,</MaximumSize>
+          </WidgetGroup>
+
+          <PushButton>
+            <!-- <TooltipId>cue_default_cue_gotoandstop</TooltipId> -->
+            <ObjectName>CueDirty</ObjectName>
+            <Size>42f,26f</Size>
+            <NumberStates>2</NumberStates>
+            <State>
+              <Number>0</Number>
+              <Text><Variable name="state_0_text"/></Text>
+              <Alignment><Variable name="Align"/></Alignment>
+              <Unpressed scalemode="STRETCH">skin:/<Variable name="BtnScheme"/>/buttons/btn_<Variable name="BtnType"/>_medium.svg</Unpressed>
+              <Pressed scalemode="STRETCH">skin:/<Variable name="BtnScheme"/>/buttons/btn_<Variable name="BtnType"/>_medium_active.svg</Pressed>
+            </State>
+            <State>
+              <Number>1</Number>
+              <Text><Variable name="state_1_text"/></Text>
+              <Alignment><Variable name="Align"/></Alignment>
+              <Unpressed scalemode="STRETCH">skin:/<Variable name="BtnScheme"/>/buttons/btn_<Variable name="BtnType"/>_medium_set.svg</Unpressed>
+              <Pressed scalemode="STRETCH">skin:/<Variable name="BtnScheme"/>/buttons/btn_<Variable name="BtnType"/>_medium_active.svg</Pressed>
+            </State>
+            <Connection>
+              <ConfigKey><Variable name="Group"/>,cue_dirty</ConfigKey>
+            </Connection>
+            <Connection>
+              <ConfigKey persist="true">[Controls],AutoPersistCues</ConfigKey>
+              <BindProperty>visible</BindProperty>
+            </Connection>
+          </PushButton>
+
+          <WidgetGroup>
+            <SizePolicy>me,min</SizePolicy>
+            <MinimumSize>2,</MinimumSize>
             <MaximumSize>40,</MaximumSize>
           </WidgetGroup>
 

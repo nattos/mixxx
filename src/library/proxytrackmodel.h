@@ -23,6 +23,8 @@ class ProxyTrackModel : public QSortFilterProxyModel, public TrackModel {
 
     // Inherited from TrackModel
     Capabilities getCapabilities() const final;
+    bool isModelGlobal() const final;
+    QString getTrackModelKey() const final;
     TrackPointer getTrack(const QModelIndex& index) const final;
     TrackPointer getTrackByRef(const TrackRef& trackRef) const final;
     QUrl getTrackUrl(const QModelIndex& index) const final;

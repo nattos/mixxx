@@ -45,6 +45,22 @@ automatically shows a beat-grid for them, and allows you to synchronize tracks u
      </property>
      <layout class="QVBoxLayout" name="verticalLayout">
       <item>
+       <widget class="QComboBox" name="comboBoxBpmRange">
+        <property name="minimumSize">
+         <size>
+          <width>200</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>The preferred range for analyzed tracks.</string>
+        </property>
+        <property name="layoutDirection">
+         <enum>Qt::LeftToRight</enum>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QCheckBox" name="checkBoxFixedTempo">
         <property name="toolTip">
          <string>Converts beats detected by the analyzer into a fixed-tempo beatgrid.

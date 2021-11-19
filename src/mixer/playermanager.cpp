@@ -3,8 +3,10 @@
 #include <QRegularExpression>
 
 #include "control/controlobject.h"
+#include "control/controlpushbutton.h"
 #include "effects/effectsmanager.h"
 #include "engine/channels/enginedeck.h"
+#include "engine/enginebuffer.h"
 #include "engine/enginemaster.h"
 #include "library/library.h"
 #include "mixer/auxiliary.h"
@@ -24,6 +26,8 @@
 #include "util/sleepableqthread.h"
 
 namespace {
+
+constexpr int kNowPlayingUpdateIntervalMillis = 500;
 
 const mixxx::Logger kLogger("PlayerManager");
 
@@ -62,6 +66,9 @@ bool extractIntFromRegex(const QRegularExpression& regex, const QString& group, 
 
 } // anonymous namespace
 
+extern void UpdateNowPlayingInfo(bool loaded, bool playing, const TrackPointer& pTrack, double playPositionPercent);
+extern void DoNowPlayingStuff(PlayerManager*);
+
 //static
 QAtomicPointer<ControlProxy> PlayerManager::m_pCOPNumDecks;
 //static
@@ -75,6 +82,7 @@ PlayerManager::PlayerManager(UserSettingsPointer pConfig,
         EngineMaster* pEngine)
         : m_mutex(QT_RECURSIVE_MUTEX_INIT),
           m_pConfig(pConfig),
+          m_pLibrary(nullptr),
           m_pSoundManager(pSoundManager),
           m_pEffectsManager(pEffectsManager),
           m_pEngine(pEngine),
@@ -102,10 +110,43 @@ PlayerManager::PlayerManager(UserSettingsPointer pConfig,
     m_pCONumAuxiliaries->connectValueChangeRequest(this,
             &PlayerManager::slotChangeNumAuxiliaries, Qt::DirectConnection);
 
+    m_pPlayPrevTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_prevtrack"));
+    m_pPlayPrevTrack->setButtonMode(ControlPushButton::PUSH);
+    m_pPlayPrevTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayPrevTrack, Qt::DirectConnection);
+    m_pPlayNextTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_nexttrack"));
+    m_pPlayNextTrack->setButtonMode(ControlPushButton::PUSH);
+    m_pPlayNextTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayNextTrack, Qt::DirectConnection);
+    m_pPlayPlayOrPauseTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_playorpause"));
+    m_pPlayPlayOrPauseTrack->setButtonMode(ControlPushButton::PUSH);
+    m_pPlayPlayOrPauseTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayPlayOrPause, Qt::DirectConnection);
+    m_pPlayPlayTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_play"));
+    m_pPlayPlayTrack->setButtonMode(ControlPushButton::PUSH);
+    m_pPlayPlayTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayPlay, Qt::DirectConnection);
+    m_pPlayPauseTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_pause"));
+    m_pPlayPauseTrack->setButtonMode(ControlPushButton::TOGGLE);
+    m_pPlayPauseTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayPause, Qt::DirectConnection);
+    m_pPlayStopTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_stop"));
+    m_pPlayStopTrack->setButtonMode(ControlPushButton::PUSH);
+    m_pPlayStopTrack->connectValueChangeRequest(this,
+            &PlayerManager::slotPlayStop, Qt::DirectConnection);
+
+    m_pUseSimplePlayer = make_parented<ControlProxy>("[Master]", "use_simpleplayer", this);
+
     // This is parented to the PlayerManager so does not need to be deleted
     m_pSamplerBank = new SamplerBank(this);
 
     m_cloneTimer.start();
+
+    m_pNowPlayingUpdateTimer = new QTimer(this);
+    connect(m_pNowPlayingUpdateTimer, &QTimer::timeout, this, &PlayerManager::slotUpdateNowPlayingInfo, Qt::QueuedConnection);
+    m_pNowPlayingUpdateTimer->setInterval(kNowPlayingUpdateIntervalMillis);
+
+    DoNowPlayingStuff(this);
 }
 
 PlayerManager::~PlayerManager() {
@@ -132,6 +173,14 @@ PlayerManager::~PlayerManager() {
     delete m_pCONumPreviewDecks;
     delete m_pCONumMicrophones;
     delete m_pCONumAuxiliaries;
+    delete m_pPlayPrevTrack;
+    delete m_pPlayNextTrack;
+    delete m_pPlayPlayOrPauseTrack;
+    delete m_pPlayPlayTrack;
+    delete m_pPlayPauseTrack;
+    delete m_pPlayStopTrack;
+
+    delete m_pNowPlayingUpdateTimer;
 
     if (m_pTrackAnalysisScheduler) {
         m_pTrackAnalysisScheduler->stop();
@@ -141,6 +190,7 @@ PlayerManager::~PlayerManager() {
 
 void PlayerManager::bindToLibrary(Library* pLibrary) {
     const auto locker = lockMutex(&m_mutex);
+    m_pLibrary = pLibrary;
     connect(pLibrary, &Library::loadTrackToPlayer, this, &PlayerManager::slotLoadTrackToPlayer);
     connect(pLibrary,
             &Library::loadTrack,
@@ -354,6 +404,163 @@ void PlayerManager::slotChangeNumAuxiliaries(double v) {
     m_pCONumAuxiliaries->setAndConfirm(m_auxiliaries.size());
 }
 
+void PlayerManager::slotPlayPrevTrack(double v) {
+    if (v == 0.) {
+        return;
+    }
+    qDebug() << "slotPlayPrevTrack";
+    loadNextTrackIntoActiveDeck(-1, false);
+}
+
+void PlayerManager::slotPlayNextTrack(double v) {
+    if (v == 0.) {
+        return;
+    }
+    qDebug() << "slotPlayNextTrack";
+    loadNextTrackIntoActiveDeck(1, false);
+}
+
+void PlayerManager::slotPlayPlay(double v) {
+    if (v == 0.) {
+        return;
+    }
+    qDebug() << "slotPlayPlay";
+    setActiveDeckPlayState(PlayState::Play);
+}
+
+void PlayerManager::slotPlayPlayOrPause(double v) {
+    if (v == 0.) {
+        return;
+    }
+    qDebug() << "slotPlayPlayOrPause";
+    setActiveDeckPlayState(PlayState::PlayOrPause);
+}
+
+void PlayerManager::slotPlayPause(double) {
+    qDebug() << "slotPlayPause";
+    setActiveDeckPlayState(PlayState::Pause);
+}
+
+void PlayerManager::slotPlayStop(double v) {
+    if (v == 0.) {
+        return;
+    }
+    qDebug() << "slotPlayStop";
+    setActiveDeckPlayState(PlayState::Stop);
+}
+
+void PlayerManager::setActiveDeckPlayState(PlayState state) {
+    auto locker = lockMutex(&m_mutex);
+    QList<Deck*>::iterator it = m_decks.begin();
+    while (it != m_decks.end()) {
+        Deck* pDeck = *it;
+        if (pDeck->getLoadedTrack()) {
+            ControlObject* playControl =
+                    ControlObject::getControl(ConfigKey(pDeck->getGroup(), "play"));
+            bool isPlaying = playControl && playControl->get() != 0.;
+
+            locker.unlock();
+
+            switch (state) {
+                case PlayState::PlayOrPause:
+                    if (playControl) {
+                        playControl->set(isPlaying ? 0. : 1.);
+                    }
+                    break;
+                case PlayState::Play:
+                    if (!isPlaying) {
+                        playControl->set(1.);
+                    } else {
+                        pDeck->seekToSeekOnLoadPosition();
+                        if (playControl) {
+                            playControl->set(1.);
+                        }
+                    }
+                    break;
+                case PlayState::Pause:
+                    if (playControl) {
+                        playControl->set(isPlaying ? 0. : 1.);
+                    }
+                    break;
+                case PlayState::Stop:
+                    if (playControl) {
+                        playControl->set(0.);
+                    }
+                    pDeck->seekToSeekOnLoadPosition();
+                    break;
+            }
+            return;
+        }
+        ++it;
+    }
+
+    // Fallback.
+    if (state == PlayState::Play || state == PlayState::PlayOrPause) {
+        loadNextTrackIntoActiveDeck(0, true);
+    }
+}
+
+void PlayerManager::slotPlaySeekToTime(double timeSeconds) {
+    seekActiveDeckToTime(timeSeconds);
+}
+
+void PlayerManager::seekActiveDeckToTime(double timeSeconds) {
+    auto locker = lockMutex(&m_mutex);
+    QList<Deck*>::iterator it = m_decks.begin();
+    while (it != m_decks.end()) {
+        Deck* pDeck = *it;
+        TrackPointer pTrack = pDeck->getLoadedTrack();
+        if (pTrack) {
+            double duration = pTrack->getDuration();
+            if (duration > 0) {
+                double fractionalPos = timeSeconds / duration;
+                EngineBuffer* pBuffer = pDeck->getEngineDeck()->getEngineBuffer();
+                mixxx::audio::FramePos trackEndPosition = pBuffer->getTrackEndPosition();
+                if (trackEndPosition.isValid()) {
+                    auto seekPosition = trackEndPosition * fractionalPos;
+                    pBuffer->seekAbs(seekPosition);
+                }
+            }
+            return;
+        }
+        ++it;
+    }
+}
+
+void PlayerManager::loadNextTrackIntoActiveDeck(int offset, bool forcePlay) {
+    auto locker = lockMutex(&m_mutex);
+    QList<Deck*>::iterator it = m_decks.begin();
+    while (it != m_decks.end()) {
+        Deck* pDeck = *it;
+        TrackCursor cursor = pDeck->getLoadedTrackCursor();
+        if (cursor.IsActive && cursor.IsActive(cursor) && pDeck->getLoadedTrack()) {
+            TrackCursor nextCursor = cursor.GetTrackWithOffset(cursor, offset);
+
+            ControlObject* playControl =
+                    ControlObject::getControl(ConfigKey(pDeck->getGroup(), "play"));
+            bool isPlaying = playControl && playControl->get() == 1.;
+
+            locker.unlock();
+            pDeck->slotLoadTrack(nextCursor, isPlaying || forcePlay);
+            return;
+        }
+        ++it;
+    }
+
+    if (m_pLibrary) {
+        TrackPointer pTrack = nullptr;
+        if (m_decks.size() > 0) {
+            Deck* pDeck = *m_decks.begin();
+            pTrack = pDeck->getLoadedTrack();
+            TrackCursor cursor = m_pLibrary->makeTrackCursor(pTrack);
+            if (cursor.GetTrackWithOffset) {
+                cursor = cursor.GetTrackWithOffset(cursor, cursor.Track ? offset : (offset < 0 ? -1 : 0));
+            }
+            pDeck->slotLoadTrack(cursor, forcePlay);
+        }
+    }
+}
+
 void PlayerManager::addDeck() {
     const auto locker = lockMutex(&m_mutex);
     double count = m_pCONumDecks->get() + 1;
@@ -389,6 +596,18 @@ void PlayerManager::addDeckInner() {
             this,
             &PlayerManager::noVinylControlInputConfigured);
 
+    connect(pDeck,
+            &BaseTrackPlayer::playChanged,
+            this,
+            &PlayerManager::slotDeckPlayChanged);
+    connect(pDeck,
+            &BaseTrackPlayer::newTrackLoaded,
+            this,
+            &PlayerManager::slotNewTrackLoaded);
+    connect(pDeck,
+            &BaseTrackPlayer::playerEmpty,
+            this,
+            &PlayerManager::slotEmptyTrackLoaded);
     if (m_pTrackAnalysisScheduler) {
         connect(pDeck,
                 &BaseTrackPlayer::newTrackLoaded,
@@ -598,7 +817,7 @@ void PlayerManager::slotCloneDeck(const QString& source_group, const QString& ta
     pPlayer->slotCloneFromGroup(source_group);
 }
 
-void PlayerManager::slotLoadTrackToPlayer(TrackPointer pTrack, const QString& group, bool play) {
+void PlayerManager::slotLoadTrackToPlayer(TrackCursor cursor, const QString& group, bool play) {
     // Do not lock mutex in this method unless it is changed to access
     // PlayerManager state.
     BaseTrackPlayer* pPlayer = getPlayer(group);
@@ -632,7 +851,7 @@ void PlayerManager::slotLoadTrackToPlayer(TrackPointer pTrack, const QString& gr
         // so clone another playing deck instead of loading the selected track
         pPlayer->slotCloneDeck();
     } else {
-        pPlayer->slotLoadTrack(pTrack, play);
+        pPlayer->slotLoadTrack(cursor, play);
     }
 
     m_lastLoadedPlayer = group;
@@ -656,26 +875,34 @@ void PlayerManager::slotLoadToSampler(const QString& location, int sampler) {
     slotLoadToPlayer(location, groupForSampler(sampler-1));
 }
 
-void PlayerManager::slotLoadTrackIntoNextAvailableDeck(TrackPointer pTrack) {
+bool PlayerManager::isUseSimplePlayer() const {
+    bool isSimplePlayer = m_pUseSimplePlayer->get() != 0.;
+    return isSimplePlayer;
+}
+
+void PlayerManager::slotLoadTrackIntoNextAvailableDeck(TrackCursor cursor) {
     auto locker = lockMutex(&m_mutex);
+    bool isSimplePlayer = m_pUseSimplePlayer->get() != 0.;
     QList<Deck*>::iterator it = m_decks.begin();
     while (it != m_decks.end()) {
         Deck* pDeck = *it;
         ControlObject* playControl =
                 ControlObject::getControl(ConfigKey(pDeck->getGroup(), "play"));
-        if (playControl && playControl->get() != 1.) {
+        bool isPlaying = playControl && playControl->get() == 1.;
+        if (isSimplePlayer || !isPlaying) {
             locker.unlock();
-            pDeck->slotLoadTrack(pTrack, false);
+            pDeck->slotLoadTrack(cursor, isSimplePlayer);
             // Test for a fixed race condition with fast loads
             //SleepableQThread::sleep(1);
-            //pDeck->slotLoadTrack(TrackPointer(), false);
+            //pDeck->slotLoadTrack(TrackCursor(), false);
             return;
         }
         ++it;
     }
 }
 
-void PlayerManager::slotLoadTrackIntoNextAvailableSampler(TrackPointer pTrack) {
+void PlayerManager::slotLoadTrackIntoNextAvailableSampler(TrackCursor cursor) {
+    TrackPointer pTrack = cursor.Track;
     auto locker = lockMutex(&m_mutex);
     QList<Sampler*>::iterator it = m_samplers.begin();
     while (it != m_samplers.end()) {
@@ -684,11 +911,73 @@ void PlayerManager::slotLoadTrackIntoNextAvailableSampler(TrackPointer pTrack) {
                 ControlObject::getControl(ConfigKey(pSampler->getGroup(), "play"));
         if (playControl && playControl->get() != 1.) {
             locker.unlock();
-            pSampler->slotLoadTrack(pTrack, false);
+            pSampler->slotLoadTrack(cursor, false);
             return;
         }
         ++it;
     }
+}
+
+void PlayerManager::slotUpdateNowPlayingInfo() {
+    updateNowPlayingInfo(false);
+}
+
+void PlayerManager::updateNowPlayingInfo(bool isNewTrack) {
+    qDebug() << "UpdateNowPlayingInfo();";
+    auto locker = lockMutex(&m_mutex);
+
+    bool isPlaying = false;
+    double playPositionPercent = 0.0;
+    TrackPointer playingTrack = nullptr;
+
+    QList<Deck*>::iterator it = m_decks.begin();
+    while (it != m_decks.end()) {
+        Deck* pDeck = *it;
+        TrackPointer pTrack = pDeck->getLoadedTrack();
+        if (pTrack) {
+            ControlObject* playControl =
+                    ControlObject::getControl(ConfigKey(pDeck->getGroup(), "play"));
+            isPlaying = playControl && playControl->get() == 1.;
+            playingTrack = pTrack;
+            playPositionPercent = pDeck->getEngineDeck()->getEngineBuffer()->getVisualPlayPos();
+            break;
+        }
+        ++it;
+    }
+
+    if (playingTrack) {
+        ::UpdateNowPlayingInfo(true, isPlaying, playingTrack, playPositionPercent);
+        if (isPlaying) {
+            m_pNowPlayingUpdateTimer->setSingleShot(false);
+            m_pNowPlayingUpdateTimer->start(kNowPlayingUpdateIntervalMillis);
+        } else {
+            // Note: Hacky hack to refresh album art if it hasn't been cached, after it has loaded.
+            if (isNewTrack) {
+                m_pNowPlayingUpdateTimer->setSingleShot(true);
+                m_pNowPlayingUpdateTimer->start(kNowPlayingUpdateIntervalMillis);
+            } else {
+                m_pNowPlayingUpdateTimer->setSingleShot(true);
+                m_pNowPlayingUpdateTimer->stop();
+            }
+        }
+    } else {
+        ::UpdateNowPlayingInfo(false, false, nullptr, 0.0);
+        m_pNowPlayingUpdateTimer->setSingleShot(true);
+        m_pNowPlayingUpdateTimer->stop();
+    }
+    m_pPlayPauseTrack->setAndConfirm((playingTrack && !isPlaying) ? 1. : 0.);
+}
+
+void PlayerManager::slotDeckPlayChanged() {
+    updateNowPlayingInfo(false);
+}
+
+void PlayerManager::slotNewTrackLoaded(TrackPointer) {
+    updateNowPlayingInfo(true);
+}
+
+void PlayerManager::slotEmptyTrackLoaded() {
+    updateNowPlayingInfo(true);
 }
 
 void PlayerManager::slotAnalyzeTrack(TrackPointer track) {

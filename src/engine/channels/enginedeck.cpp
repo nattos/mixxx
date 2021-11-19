@@ -56,6 +56,7 @@ void EngineDeck::process(CSAMPLE* pOut, const int iBufferSize) {
         m_bPassthroughWasActive = true;
         m_sampleBuffer = nullptr;
         m_pPregain->setSpeedAndScratching(1, false);
+        isPlaying = true;
     } else {
         // If passthrough is no longer enabled, zero out the buffer
         if (m_bPassthroughWasActive) {
@@ -66,6 +67,7 @@ void EngineDeck::process(CSAMPLE* pOut, const int iBufferSize) {
 
         // Process the raw audio
         m_pBuffer->process(pOut, iBufferSize);
+        isPlaying = m_pBuffer->isPlaying;
         m_pPregain->setSpeedAndScratching(m_pBuffer->getSpeed(), m_pBuffer->getScratching());
         m_bPassthroughWasActive = false;
     }

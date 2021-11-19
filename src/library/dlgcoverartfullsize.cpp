@@ -41,7 +41,7 @@ DlgCoverArtFullSize::DlgCoverArtFullSize(QWidget* parent, BaseTrackPlayer* pPlay
         connect(pPlayer,
                 &BaseTrackPlayer::newTrackLoaded,
                 this,
-                &DlgCoverArtFullSize::slotLoadTrack);
+                &DlgCoverArtFullSize::slotLoadTrackDirect);
     }
 
     setupUi(this);
@@ -52,7 +52,7 @@ void DlgCoverArtFullSize::closeEvent(QCloseEvent* event) {
         // Since the widget has a parent, this instance will be reused again.
         // We need to prevent qt from destroying it's children
         hide();
-        slotLoadTrack(nullptr);
+        handleLoadTrack(nullptr);
         event->ignore();
     } else {
         QDialog::closeEvent(event);
@@ -74,10 +74,18 @@ void DlgCoverArtFullSize::init(TrackPointer pTrack) {
 
     // This must be called after show() to set the window title. Refer to the
     // comment in slotLoadTrack for details.
-    slotLoadTrack(pTrack);
+    handleLoadTrack(pTrack);
 }
 
-void DlgCoverArtFullSize::slotLoadTrack(TrackPointer pTrack) {
+void DlgCoverArtFullSize::slotLoadTrack(TrackCursor cursor) {
+    handleLoadTrack(cursor.Track);
+}
+
+void DlgCoverArtFullSize::slotLoadTrackDirect(TrackPointer pTrack) {
+    handleLoadTrack(pTrack);
+}
+
+void DlgCoverArtFullSize::handleLoadTrack(TrackPointer pTrack) {
     if (m_pLoadedTrack != nullptr) {
         disconnect(m_pLoadedTrack.get(),
                 &Track::coverArtUpdated,

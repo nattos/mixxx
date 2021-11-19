@@ -10,6 +10,7 @@ class VelocityController;
 class RateIIFilter;
 
 class PositionScratchController : public QObject {
+    Q_OBJECT
   public:
     PositionScratchController(const QString& group);
     virtual ~PositionScratchController();
@@ -19,6 +20,12 @@ class PositionScratchController : public QObject {
     bool isEnabled();
     double getRate();
     void notifySeek(mixxx::audio::FramePos position);
+
+  public slots:
+    void slotScratchEnable(double);
+
+  signals:
+    void engineWakeRequested();
 
   private:
     const QString m_group;

@@ -134,7 +134,7 @@ void WCueMenuPopup::slotDeleteCue() {
     VERIFY_OR_DEBUG_ASSERT(m_pTrack != nullptr) {
         return;
     }
-    m_pTrack->removeCue(m_pCue);
+    m_pTrack->removeCue(m_pCue, true);
     hide();
 }
 

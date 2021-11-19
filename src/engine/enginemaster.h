@@ -69,6 +69,8 @@ class EngineMaster : public QObject, public AudioSource {
 
     void process(const int iBufferSize);
 
+    void requestAwake();
+
     // Add an EngineChannel to the mixing engine. This is not thread safe --
     // only call it before the engine has started mixing.
     void addChannel(EngineChannel* pChannel);
@@ -244,6 +246,11 @@ class EngineMaster : public QObject, public AudioSource {
                              sizeof(long double)];
     };
 
+    std::function<void(void)> onRequestAwake;
+    std::function<bool(void)> isAwake;
+    volatile bool keepAwake = false;
+    volatile int m_keepAwakeSamples;
+
   protected:
     // The master buffer is protected so it can be accessed by test subclasses.
     CSAMPLE* m_pMaster;
@@ -326,6 +333,8 @@ class EngineMaster : public QObject, public AudioSource {
     ControlPushButton* m_pXFaderReverse;
     ControlPushButton* m_pHeadSplitEnabled;
     ControlObject* m_pKeylockEngine;
+    ControlPushButton* m_pUseSimplePlayer;
+    ControlPushButton* m_pEditCuePoints;
 
     PflGainCalculator m_headphoneGain;
     TalkoverGainCalculator m_talkoverGain;

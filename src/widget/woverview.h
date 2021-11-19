@@ -56,6 +56,7 @@ class WOverview : public WWidget, public TrackDropTarget {
             PlayerManager* pPlayerManager,
             UserSettingsPointer pConfig,
             QWidget* parent = nullptr);
+    virtual ~WOverview();
 
     void mouseMoveEvent(QMouseEvent* e) override;
     void mouseReleaseEvent(QMouseEvent* e) override;
@@ -142,6 +143,7 @@ class WOverview : public WWidget, public TrackDropTarget {
     ControlProxy* m_trackSamplesControl;
     ControlProxy* m_playpositionControl;
     ControlProxy* m_pPassthroughControl;
+    ControlProxy* m_pEditCuePoints;
 
     // Current active track
     TrackPointer m_pCurrentTrack;

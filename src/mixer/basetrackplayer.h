@@ -36,9 +36,11 @@ class BaseTrackPlayer : public BasePlayer {
     ~BaseTrackPlayer() override = default;
 
     virtual TrackPointer getLoadedTrack() const = 0;
+    virtual TrackCursor getLoadedTrackCursor() const = 0;
 
   public slots:
-    virtual void slotLoadTrack(TrackPointer pTrack, bool bPlay = false) = 0;
+    virtual void slotLoadTrack(TrackCursor pTrack, bool bPlay = false) = 0;
+    virtual void slotLoadNextTrack(TrackCursor cursor) = 0;
     virtual void slotCloneFromGroup(const QString& group) = 0;
     virtual void slotCloneDeck() = 0;
 
@@ -47,6 +49,7 @@ class BaseTrackPlayer : public BasePlayer {
     void loadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void playerEmpty();
     void noVinylControlInputConfigured();
+    void playChanged();
 };
 
 class BaseTrackPlayerImpl : public BaseTrackPlayer {
@@ -64,6 +67,7 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     ~BaseTrackPlayerImpl() override;
 
     TrackPointer getLoadedTrack() const final;
+    TrackCursor getLoadedTrackCursor() const final;
 
     // TODO(XXX): Only exposed to let the passthrough AudioInput get
     // connected. Delete me when EngineMaster supports AudioInput assigning.
@@ -73,9 +77,12 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
 
     // For testing, loads a fake track.
     TrackPointer loadFakeTrack(bool bPlay, double filebpm);
+    void seekToCuePoint();
+    void seekToSeekOnLoadPosition();
 
   public slots:
-    void slotLoadTrack(TrackPointer track, bool bPlay) final;
+    void slotLoadTrack(TrackCursor track, bool bPlay) final;
+    void slotLoadNextTrack(TrackCursor track) final;
     void slotCloneFromGroup(const QString& group) final;
     void slotCloneDeck() final;
     void slotTrackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack);
@@ -104,7 +111,7 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
   private:
     void setReplayGain(double value);
 
-    void loadTrack(TrackPointer pTrack);
+    void loadTrack(TrackCursor cursor);
     TrackPointer unloadTrack();
 
     void connectLoadedTrack();
@@ -113,6 +120,7 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     UserSettingsPointer m_pConfig;
     EngineMaster* m_pEngineMaster;
     TrackPointer m_pLoadedTrack;
+    TrackCursor m_loadedTrackCursor;
     EngineDeck* m_pChannel;
     bool m_replaygainPending;
     EngineChannel* m_pChannelToCloneFrom;
@@ -144,6 +152,7 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     std::unique_ptr<ControlPushButton> m_pShiftCuesLater;
     std::unique_ptr<ControlPushButton> m_pShiftCuesLaterSmall;
     std::unique_ptr<ControlObject> m_pShiftCues;
+    parented_ptr<ControlProxy> m_pEditCuePoints;
 
     std::unique_ptr<ControlObject> m_pUpdateReplayGainFromPregain;
 
@@ -161,4 +170,5 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     parented_ptr<ControlProxy> m_pInputConfigured;
     parented_ptr<ControlProxy> m_pVinylControlEnabled;
     parented_ptr<ControlProxy> m_pVinylControlStatus;
+    parented_ptr<ControlProxy> m_pUseSimplePlayer;
 };

@@ -26,7 +26,8 @@ class WCoverArt : public QWidget, public WBaseWidget, public TrackDropTarget {
     void setup(const QDomNode& node, const SkinContext& context);
 
   public slots:
-    void slotLoadTrack(TrackPointer);
+    void slotLoadTrack(TrackCursor);
+    void slotLoadTrackDirect(TrackPointer);
     void slotLoadingTrack(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void slotReset();
     void slotEnable(bool);
@@ -59,6 +60,7 @@ class WCoverArt : public QWidget, public WBaseWidget, public TrackDropTarget {
     bool event(QEvent* pEvent) override;
 
   private:
+    void handleLoadTrack(TrackPointer);
     QPixmap scaledCoverArt(const QPixmap& normal);
 
     const QString m_group;

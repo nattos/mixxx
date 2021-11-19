@@ -41,13 +41,13 @@ void WLibrarySidebar::contextMenuEvent(QContextMenuEvent *event) {
 // Drag enter event, happens when a dragged item enters the track sources view
 void WLibrarySidebar::dragEnterEvent(QDragEnterEvent * event) {
     qDebug() << "WLibrarySidebar::dragEnterEvent" << event->mimeData()->formats();
-    if (event->mimeData()->hasUrls()) {
+    if (DragAndDropHelper::hasUrls(event->mimeData())) {
         // We don't have a way to ask the LibraryFeatures whether to accept a
         // drag so for now we accept all drags. Since almost every
         // LibraryFeature accepts all files in the drop and accepts playlist
         // drops we default to those flags to DragAndDropHelper.
         QList<mixxx::FileInfo> fileInfos = DragAndDropHelper::supportedTracksFromUrls(
-                event->mimeData()->urls(), false, true);
+                DragAndDropHelper::getUrls(event->mimeData()), false, true);
         if (!fileInfos.isEmpty()) {
             event->acceptProposedAction();
             return;
@@ -71,8 +71,8 @@ void WLibrarySidebar::dragMoveEvent(QDragMoveEvent * event) {
     // This has to be here instead of after, otherwise all drags will be
     // rejected -- rryan 3/2011
     QTreeView::dragMoveEvent(event);
-    if (event->mimeData()->hasUrls()) {
-        const QList<QUrl> urls = event->mimeData()->urls();
+    if (DragAndDropHelper::hasUrls(event->mimeData())) {
+        const QList<QUrl> urls = DragAndDropHelper::getUrls(event->mimeData());
         // Drag and drop within this widget
         if ((event->source() == this)
                 && (event->possibleActions() & Qt::MoveAction)) {
@@ -125,7 +125,7 @@ void WLibrarySidebar::timerEvent(QTimerEvent *event) {
 
 // Drag-and-drop "drop" event. Occurs when something is dropped onto the track sources view
 void WLibrarySidebar::dropEvent(QDropEvent * event) {
-    if (event->mimeData()->hasUrls()) {
+    if (DragAndDropHelper::hasUrls(event->mimeData())) {
         // Drag and drop within this widget
         if ((event->source() == this)
                 && (event->possibleActions() & Qt::MoveAction)) {
@@ -141,7 +141,7 @@ void WLibrarySidebar::dropEvent(QDropEvent * event) {
                 QModelIndex destIndex = indexAt(event->pos());
                 // event->source() will return NULL if something is dropped from
                 // a different application
-                const QList<QUrl> urls = event->mimeData()->urls();
+                const QList<QUrl> urls = DragAndDropHelper::getUrls(event->mimeData());
                 if (sidebarModel->dropAccept(destIndex, urls, event->source())) {
                     event->acceptProposedAction();
                 } else {

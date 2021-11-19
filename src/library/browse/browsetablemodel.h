@@ -54,6 +54,9 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
 
     void setPath(mixxx::FileAccess path);
 
+    bool isModelGlobal() const override;
+    QString getTrackModelKey() const override;
+
     TrackPointer getTrack(const QModelIndex& index) const override;
     TrackPointer getTrackByRef(const TrackRef& trackRef) const override;
     TrackModel::Capabilities getCapabilities() const override;
@@ -98,6 +101,7 @@ class BrowseTableModel final : public QStandardItemModel, public virtual TrackMo
 
     TrackCollectionManager* const m_pTrackCollectionManager;
 
+    QString m_path;
     QList<int> m_searchColumns;
     RecordingManager* m_pRecordingManager;
     BrowseThreadPointer m_pBrowseThread;

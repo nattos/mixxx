@@ -38,6 +38,9 @@ RateControl::RateControl(const QString& group,
           m_tempRateRatio(0.0),
           m_dRateTempRampChange(0.0) {
     m_pScratchController = new PositionScratchController(group);
+    connect(m_pScratchController, &PositionScratchController::engineWakeRequested,
+            this, &RateControl::slotEngineWakeRequested,
+            Qt::DirectConnection);
 
     // This is the resulting rate ratio that can be used for display or calculations.
     // The track original rate ratio is 1.
@@ -356,6 +359,10 @@ void RateControl::slotControlRatePermUpSmall(double v) {
                            m_pRateDir->get() * m_dPermanentRateChangeFine.getValue() / (100. * m_pRateRange->get()));
         slotRateSliderChanged(m_pRateSlider->get());
     }
+}
+
+void RateControl::slotEngineWakeRequested() {
+    emit engineWakeRequested();
 }
 
 double RateControl::getWheelFactor() const {

@@ -15,6 +15,7 @@
 class Auxiliary;
 class BaseTrackPlayer;
 class ControlObject;
+class ControlPushButton;
 class Deck;
 class EffectsManager;
 class EngineMaster;
@@ -54,11 +55,20 @@ class PlayerManagerInterface {
 class PlayerManager : public QObject, public PlayerManagerInterface {
     Q_OBJECT
   public:
+    enum class PlayState {
+        PlayOrPause,
+        Play,
+        Pause,
+        Stop,
+    };
+
     PlayerManager(UserSettingsPointer pConfig,
             SoundManager* pSoundManager,
             EffectsManager* pEffectsManager,
             EngineMaster* pEngine);
     ~PlayerManager() override;
+
+    bool isUseSimplePlayer() const;
 
     // Add a deck to the PlayerManager
     // (currently unused, kept for consistency with other types)
@@ -178,19 +188,19 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
 
   public slots:
     // Slots for loading tracks into a Player, which is either a Sampler or a Deck
-    void slotLoadTrackToPlayer(TrackPointer pTrack, const QString& group, bool play = false);
+    void slotLoadTrackToPlayer(TrackCursor cursor, const QString& group, bool play = false);
     void slotLoadToPlayer(const QString& location, const QString& group);
     void slotCloneDeck(const QString& source_group, const QString& target_group);
 
     // Slots for loading tracks to decks
-    void slotLoadTrackIntoNextAvailableDeck(TrackPointer pTrack);
+    void slotLoadTrackIntoNextAvailableDeck(TrackCursor cursor);
     // Loads the location to the deck. deckNumber is 1-indexed
     void slotLoadToDeck(const QString& location, int deckNumber);
 
     // Loads the location to the preview deck. previewDeckNumber is 1-indexed
     void slotLoadToPreviewDeck(const QString& location, int previewDeckNumber);
     // Slots for loading tracks to samplers
-    void slotLoadTrackIntoNextAvailableSampler(TrackPointer pTrack);
+    void slotLoadTrackIntoNextAvailableSampler(TrackCursor cursor);
     // Loads the location to the sampler. samplerNumber is 1-indexed
     void slotLoadToSampler(const QString& location, int samplerNumber);
 
@@ -200,7 +210,19 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     void slotChangeNumMicrophones(double v);
     void slotChangeNumAuxiliaries(double v);
 
+    void slotPlayPrevTrack(double v);
+    void slotPlayNextTrack(double v);
+    void slotPlayPlayOrPause(double v);
+    void slotPlayPlay(double v);
+    void slotPlayPause(double v);
+    void slotPlayStop(double v);
+    void slotPlaySeekToTime(double timeSeconds);
+    void slotUpdateNowPlayingInfo();
+
   private slots:
+    void slotDeckPlayChanged();
+    void slotNewTrackLoaded(TrackPointer track);
+    void slotEmptyTrackLoaded();
     void slotAnalyzeTrack(TrackPointer track);
 
     void onTrackAnalysisProgress(TrackId trackId, AnalyzerProgress analyzerProgress);
@@ -232,6 +254,8 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     void trackAnalyzerIdle();
 
   private:
+    void seekActiveDeckToTime(double timeSeconds);
+    void updateNowPlayingInfo(bool isNewTrack);
     TrackPointer lookupTrack(QString location);
     // Must hold m_mutex before calling this method. Internal method that
     // creates a new deck.
@@ -249,6 +273,9 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     // creates a new auxiliary.
     void addAuxiliaryInner();
 
+    void setActiveDeckPlayState(PlayState state);
+    void loadNextTrackIntoActiveDeck(int offset, bool forcePlay);
+
     // Used to protect access to PlayerManager state across threads.
     mutable QT_RECURSIVE_MUTEX m_mutex;
 
@@ -256,6 +283,7 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     QString m_lastLoadedPlayer;
 
     UserSettingsPointer m_pConfig;
+    Library* m_pLibrary;
     SoundManager* m_pSoundManager;
     EffectsManager* m_pEffectsManager;
     EngineMaster* m_pEngine;
@@ -265,7 +293,14 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     ControlObject* m_pCONumPreviewDecks;
     ControlObject* m_pCONumMicrophones;
     ControlObject* m_pCONumAuxiliaries;
+    ControlPushButton* m_pPlayPlayOrPauseTrack;
+    ControlPushButton* m_pPlayPrevTrack;
+    ControlPushButton* m_pPlayNextTrack;
+    ControlPushButton* m_pPlayPlayTrack;
+    ControlPushButton* m_pPlayPauseTrack;
+    ControlPushButton* m_pPlayStopTrack;
     parented_ptr<ControlProxy> m_pAutoDjEnabled;
+    parented_ptr<ControlProxy> m_pUseSimplePlayer;
 
     TrackAnalysisScheduler::Pointer m_pTrackAnalysisScheduler;
 
@@ -275,4 +310,6 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     QList<Microphone*> m_microphones;
     QList<Auxiliary*> m_auxiliaries;
     QMap<ChannelHandle, BaseTrackPlayer*> m_players;
+
+    QTimer* m_pNowPlayingUpdateTimer;
 };

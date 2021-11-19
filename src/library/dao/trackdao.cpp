@@ -1148,7 +1148,7 @@ bool setTrackRating(const QSqlRecord& record, const int column, Track* pTrack) {
 
 bool setTrackCuePoint(const QSqlRecord& record, const int column, Track* pTrack) {
     pTrack->setMainCuePosition(mixxx::audio::FramePos::fromEngineSamplePosMaybeInvalid(
-            record.value(column).toDouble()));
+            record.value(column).toDouble()), false);
     return false;
 }
 
@@ -1484,7 +1484,7 @@ TrackPointer TrackDAO::getTrackById(TrackId trackId) const {
     }
 
     // Populate track cues from the cues table.
-    pTrack->setCuePoints(m_cueDao.getCuesForTrack(trackId));
+    pTrack->setCuePoints(m_cueDao.getCuesForTrack(trackId), false);
 
     // Normally we will set the track as clean but sometimes when loading from
     // the database we need to perform upkeep that ought to be written back to
@@ -1607,6 +1607,8 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             << trackId
             << pTrack->getFileInfo();
 
+    bool isSaveCuePoints = pTrack->isSaveCuePoints();
+
     SqlTransaction transaction(m_database);
     // PerformanceTimer time;
     // time.start();
@@ -1614,7 +1616,7 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
     QSqlQuery query(m_database);
 
     // Update everything but "location", since that's what we identify the track by.
-    query.prepare(
+    QString queryStr = QString(
             "UPDATE library SET "
             "artist=:artist,"
             "title=:title,"
@@ -1632,8 +1634,8 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             "url=:url,"
             "rating=:rating,"
             "key=:key,"
-            "key_id=:key_id,"
-            "cuepoint=:cuepoint,"
+            "key_id=:key_id,") +
+            (isSaveCuePoints ? "cuepoint=:cuepoint," : "") +
             "bpm=:bpm,"
             "replaygain=:replaygain,"
             "replaygain_peak=:replaygain_peak,"
@@ -1660,7 +1662,8 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             "coverart_color=:coverart_color,"
             "coverart_digest=:coverart_digest,"
             "coverart_hash=:coverart_hash "
-            "WHERE id=:track_id");
+            "WHERE id=:track_id";
+    query.prepare(queryStr);
 
     query.bindValue(":track_id", trackId.toVariant());
 
@@ -1686,12 +1689,17 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             trackId,
             pTrack->getWaveform(),
             pTrack->getWaveformSummary());
-    m_cueDao.saveTrackCues(
-            trackId, pTrack->getCuePoints());
+    if (isSaveCuePoints) {
+        m_cueDao.saveTrackCues(
+                trackId, pTrack->getCuePoints());
+    }
     transaction.commit();
 
     //qDebug() << "Update track in database took: " << time.elapsed().formatMillisWithUnit();
     //time.start();
+    if (isSaveCuePoints) {
+        pTrack->setSaveCuePoints(false);
+    }
     pTrack->markClean();
     //qDebug() << "Dirtying track took: " << time.elapsed().formatMillisWithUnit();
     return true;

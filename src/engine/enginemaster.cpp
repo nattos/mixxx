@@ -42,6 +42,7 @@ EngineMaster::EngineMaster(
           m_headphoneGainOld(1.0),
           m_balleftOld(1.0),
           m_balrightOld(1.0),
+          m_keepAwakeSamples(0),
           m_masterHandle(registerChannelGroup(group)),
           m_headphoneHandle(registerChannelGroup("[Headphone]")),
           m_masterOutputHandle(registerChannelGroup("[MasterOutput]")),
@@ -177,6 +178,14 @@ EngineMaster::EngineMaster(
     m_pKeylockEngine->set(pConfig->getValueString(
             ConfigKey(group, "keylock_engine")).toDouble());
 
+    m_pUseSimplePlayer = new ControlPushButton(ConfigKey(group, "use_simpleplayer"), true, 1);
+    m_pUseSimplePlayer->setButtonMode(ControlPushButton::POWERWINDOW);
+    m_pUseSimplePlayer->setStates(2);
+    // m_pUseSimplePlayer->set(pConfig->getValue<bool>(ConfigKey(group, "use_simpleplayer")) ? 1. : 0.);
+
+    m_pEditCuePoints = new ControlPushButton(ConfigKey("[Controls]", "AutoPersistCues"), true, 0);
+    m_pEditCuePoints->setButtonMode(ControlPushButton::TOGGLE);
+
     // TODO: Make this read only and make EngineMaster decide whether
     // processing the master mix is necessary.
     m_pMasterEnabled = new ControlObject(ConfigKey(group, "enabled"),
@@ -196,6 +205,8 @@ EngineMaster::EngineMaster(
 EngineMaster::~EngineMaster() {
     //qDebug() << "in ~EngineMaster()";
     delete m_pKeylockEngine;
+    delete m_pUseSimplePlayer;
+    delete m_pEditCuePoints;
     delete m_pCrossfader;
     delete m_pBalance;
     delete m_pHeadMix;
@@ -251,6 +262,11 @@ EngineMaster::~EngineMaster() {
         delete pChannelInfo->m_pMuteControl;
         delete pChannelInfo;
     }
+}
+
+void EngineMaster::requestAwake() {
+    onRequestAwake();
+    m_keepAwakeSamples = 0;
 }
 
 const CSAMPLE* EngineMaster::getMasterBuffer() const {
@@ -353,11 +369,15 @@ void EngineMaster::processChannels(int iBufferSize) {
     }
 
     // Now that the list is built and ordered, do the processing.
+    bool hadPlayingChannel = false;
     for (int i = activeChannelsStartIndex;
              i < m_activeChannels.size(); ++i) {
         ChannelInfo* pChannelInfo = m_activeChannels[i];
         EngineChannel* pChannel = pChannelInfo->m_pChannel;
         pChannel->process(pChannelInfo->m_pBuffer, iBufferSize);
+        if (pChannel->isPlaying) {
+            hadPlayingChannel = true;
+        }
 
         // Collect metadata for effects
         if (m_pEngineEffectsManager) {
@@ -365,6 +385,10 @@ void EngineMaster::processChannels(int iBufferSize) {
             pChannel->collectFeatures(&features);
             pChannelInfo->m_features = features;
         }
+    }
+    
+    if (hadPlayingChannel) {
+        m_keepAwakeSamples = 0;
     }
 
     // Do internal sync lock post-processing before the other
@@ -408,6 +432,9 @@ void EngineMaster::process(const int iBufferSize) {
 
     // Prepare all channels for output
     processChannels(m_iBufferSize);
+
+    m_keepAwakeSamples += iBufferSize;
+    keepAwake = m_keepAwakeSamples < 44100;
 
     // Compute headphone mix
     // Head phone left/right mix

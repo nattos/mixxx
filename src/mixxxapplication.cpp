@@ -85,6 +85,7 @@ void MixxxApplication::registerMetaTypes() {
     qRegisterMetaType<QList<TrackRef>>();
     qRegisterMetaType<QList<QPair<TrackRef, TrackRef>>>();
     qRegisterMetaType<TrackPointer>();
+    qRegisterMetaType<TrackCursor>();
 
     // Crates
     qRegisterMetaType<CrateId>();

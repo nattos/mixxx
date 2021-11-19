@@ -54,9 +54,17 @@ class SoundManager : public QObject {
     void queryDevicesPortaudio();
     void queryDevicesMixxx();
 
+    void refreshDefaultDevices();
+
     // Opens all the devices chosen by the user in the preferences dialog, and
     // establishes the proper connections between them and the mixing engine.
     SoundDeviceError setupDevices();
+
+    // Closes all the open sound devices. Because multiple soundcards might be
+    // open, this method simply runs through the list of all known soundcards
+    // (from PortAudio) and attempts to close them all. Closing a soundcard that
+    // isn't open is safe.
+    void closeDevices(bool sleepAfterClosing = false);
 
     // Playermanager will notify us when the number of decks changes.
     void setConfiguredDeckCount(int count);
@@ -118,12 +126,6 @@ class SoundManager : public QObject {
   private:
     // Closes all the devices and empties the list of devices we have.
     void clearDeviceList(bool sleepAfterClosing);
-
-    // Closes all the open sound devices. Because multiple soundcards might be
-    // open, this method simply runs through the list of all known soundcards
-    // (from PortAudio) and attempts to close them all. Closing a soundcard that
-    // isn't open is safe.
-    void closeDevices(bool sleepAfterClosing);
 
     void setJACKName() const;
 

@@ -172,6 +172,7 @@ EngineBuffer::EngineBuffer(const QString& group,
     m_pRepeat->setButtonMode(ControlPushButton::TOGGLE);
 
     m_pSampleRate = new ControlProxy("[Master]", "samplerate", this);
+    m_pUseSimplePlayer = new ControlProxy("[Master]", "use_simpleplayer", this);
 
     m_pKeylockEngine = new ControlProxy("[Master]", "keylock_engine", this);
     m_pKeylockEngine->connectValueChanged(this, &EngineBuffer::slotKeylockEngineChanged,
@@ -213,6 +214,9 @@ EngineBuffer::EngineBuffer(const QString& group,
 
     // Create the Rate Controller
     m_pRateControl = new RateControl(group, pConfig);
+    connect(m_pRateControl, &RateControl::engineWakeRequested,
+            this, &EngineBuffer::slotEngineWakeRequested,
+            Qt::DirectConnection);
     // Add the Rate Controller
     addControl(m_pRateControl);
     // Looping Control needs Rate Control for Reverse Button
@@ -313,6 +317,7 @@ EngineBuffer::~EngineBuffer() {
     delete m_pSlipButton;
     delete m_pRepeat;
     delete m_pSampleRate;
+    delete m_pUseSimplePlayer;
 
     delete m_pTrackLoaded;
     delete m_pTrackSamples;
@@ -388,6 +393,7 @@ void EngineBuffer::setLoop(mixxx::audio::FramePos startPosition,
 }
 
 void EngineBuffer::setEngineMaster(EngineMaster* pEngineMaster) {
+    m_pEngineMaster = pEngineMaster;
     for (const auto& pControl: qAsConst(m_engineControls)) {
         pControl->setEngineMaster(pEngineMaster);
     }
@@ -403,6 +409,29 @@ void EngineBuffer::queueNewPlaypos(mixxx::audio::FramePos position, enum SeekReq
         seekType = SEEK_STANDARD;
     }
     m_queuedSeek.setValue({position, seekType});
+
+    if (m_pEngineMaster->isAwake && !m_pEngineMaster->isAwake()) {
+        QMetaObject::invokeMethod(
+                this,
+                [this] {
+                    m_pause.lock();
+                    processSeek(true);
+                    for (const auto& pControl: qAsConst(m_engineControls)) {
+                        pControl->setFrameInfo(m_playPosition, getTrackEndPosition(), m_trackSampleRateOld);
+                    }
+                    updateIndicators(m_speed_old, 0, true);
+                    m_pause.unlock();
+                },
+                Qt::QueuedConnection);
+    }
+}
+
+void EngineBuffer::seekToCuePoint() {
+    m_pCueControl->seekToCuePoint();
+}
+
+void EngineBuffer::seekToSeekOnLoadPosition() {
+    m_pCueControl->seekToSeekOnLoadPosition();
 }
 
 void EngineBuffer::requestSyncPhase() {
@@ -526,12 +555,16 @@ void EngineBuffer::slotTrackLoading() {
 
     // Set play here, to signal the user that the play command is adopted
     m_playButton->set((double)m_bPlayAfterLoading);
+    if (m_bPlayAfterLoading) {
+        m_pEngineMaster->requestAwake();
+    }
     setTrackEndPosition(mixxx::audio::kInvalidFramePos); // Stop renderer
 }
 
 void EngineBuffer::loadFakeTrack(TrackPointer pTrack, bool bPlay) {
     if (bPlay) {
         m_playButton->set((double)bPlay);
+        m_pEngineMaster->requestAwake();
     }
     slotTrackLoaded(
             pTrack,
@@ -554,6 +587,12 @@ void EngineBuffer::slotTrackLoaded(TrackPointer pTrack,
     m_visualPlayPos->setInvalid();
     m_playPosition = kInitialPlayPosition; // for execute seeks to 0.0
     m_pCurrentTrack = pTrack;
+    if (m_loadingTrackCursor.Track == pTrack) {
+        m_currentTrackCursor = m_loadingTrackCursor;
+        m_loadingTrackCursor = TrackCursor();
+    } else {
+        m_currentTrackCursor = TrackCursor();
+    }
     m_pTrackSamples->set(iTrackNumSamples);
     m_pTrackSampleRate->set(iTrackSampleRate);
     m_pTrackLoaded->forceSet(1);
@@ -733,6 +772,9 @@ void EngineBuffer::verifyPlay() {
     bool verifiedPlay = updateIndicatorsAndModifyPlay(play, play);
     if (play != verifiedPlay) {
         m_playButton->setAndConfirm(verifiedPlay ? 1.0 : 0.0);
+        if (verifiedPlay) {
+            m_pEngineMaster->requestAwake();
+        }
     }
 }
 
@@ -752,6 +794,9 @@ void EngineBuffer::slotControlPlayRequest(double v) {
 
     // set and confirm must be called here in any case to update the widget toggle state
     m_playButton->setAndConfirm(verifiedPlay ? 1.0 : 0.0);
+    if (verifiedPlay) {
+        m_pEngineMaster->requestAwake();
+    }
 }
 
 void EngineBuffer::slotControlStart(double v)
@@ -773,6 +818,7 @@ void EngineBuffer::slotControlPlayFromStart(double v)
     if (v > 0.0) {
         doSeekFractional(0., SEEK_EXACT);
         m_playButton->set(1);
+        m_pEngineMaster->requestAwake();
     }
 }
 
@@ -803,6 +849,10 @@ void EngineBuffer::slotKeylockEngineChanged(double dIndex) {
     } else {
         m_pScaleKeylock = m_pScaleRB;
     }
+}
+
+void EngineBuffer::slotEngineWakeRequested() {
+    m_pEngineMaster->requestAwake();
 }
 
 void EngineBuffer::processTrackLocked(
@@ -1086,9 +1136,13 @@ void EngineBuffer::processTrackLocked(
     // If playbutton is pressed, check if we are at start or end of track
     if ((m_playButton->toBool() || (m_fwdButton->toBool() || m_backButton->toBool()))
             && end_of_track) {
+        bool isSimplePlayer = m_pUseSimplePlayer->get() != 0.;
         if (repeat_enabled) {
             double fractionalPos = atStart ? 1.0 : 0;
             doSeekFractional(fractionalPos, SEEK_STANDARD);
+        } else if (isSimplePlayer) {
+            emit trackWantsLoadNextTrack(m_currentTrackCursor);
+            m_playButton->set(0.);
         } else {
             m_playButton->set(0.);
         }
@@ -1163,6 +1217,8 @@ void EngineBuffer::process(CSAMPLE* pOutput, const int iBufferSize) {
 
     m_iLastBufferSize = iBufferSize;
     m_bCrossfadeReady = false;
+
+    isPlaying = m_rate_old != 0.0 || m_scratching_old;
 }
 
 void EngineBuffer::processSlip(int iBufferSize) {
@@ -1324,7 +1380,7 @@ void EngineBuffer::postProcess(const int iBufferSize) {
 
     // Update all the indicators that EngineBuffer publishes to allow
     // external parts of Mixxx to observe its status.
-    updateIndicators(m_speed_old, iBufferSize);
+    updateIndicators(m_speed_old, iBufferSize, false);
 }
 
 mixxx::audio::FramePos EngineBuffer::queuedSeekPosition() const {
@@ -1336,7 +1392,7 @@ mixxx::audio::FramePos EngineBuffer::queuedSeekPosition() const {
     return queuedSeek.position;
 }
 
-void EngineBuffer::updateIndicators(double speed, int iBufferSize) {
+void EngineBuffer::updateIndicators(double speed, int iBufferSize, bool forceUpdate) {
     if (!m_trackSampleRateOld.isValid()) {
         // This happens if Deck Passthrough is active but no track is loaded.
         // We skip indicator updates.
@@ -1363,7 +1419,7 @@ void EngineBuffer::updateIndicators(double speed, int iBufferSize) {
 
     // Update indicators that are only updated after every
     // sampleRate/kiUpdateRate samples processed.  (e.g. playposSlider)
-    if (m_iSamplesSinceLastIndicatorUpdate >
+    if (forceUpdate || m_iSamplesSinceLastIndicatorUpdate >
             (kSamplesPerFrame * m_pSampleRate->get() /
                     kPlaypositionUpdateRate)) {
         m_playposSlider->set(fFractionalPlaypos);
@@ -1411,11 +1467,13 @@ void EngineBuffer::hintReader(const double dRate) {
 }
 
 // WARNING: This method runs in the GUI thread
-void EngineBuffer::loadTrack(TrackPointer pTrack, bool play) {
+void EngineBuffer::loadTrack(TrackCursor cursor, bool play) {
+    TrackPointer pTrack = cursor.Track;
     if (pTrack) {
         // Signal to the reader to load the track. The reader will respond with
         // trackLoading and then either with trackLoaded or trackLoadFailed signals.
         m_bPlayAfterLoading = play;
+        m_loadingTrackCursor = cursor;
         m_pReader->newTrack(pTrack);
     } else {
         // Loading a null track means "eject"
@@ -1438,6 +1496,10 @@ bool EngineBuffer::isTrackLoaded() const {
 
 TrackPointer EngineBuffer::getLoadedTrack() const {
     return m_pCurrentTrack;
+}
+
+TrackCursor EngineBuffer::getLoadedTrackCursor() const {
+    return m_currentTrackCursor;
 }
 
 void EngineBuffer::slotEjectTrack(double v) {

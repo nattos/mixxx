@@ -6,6 +6,7 @@
 #include <QPointer>
 #include <QTranslator>
 
+#include "control/controlpushbutton.h"
 #include "controllers/keyboard/keyboardeventfilter.h"
 #include "database/mixxxdb.h"
 #include "library/analysisfeature.h"
@@ -37,6 +38,7 @@
 #include "mixer/playermanager.h"
 #include "moc_library.cpp"
 #include "recording/recordingmanager.h"
+#include "track/track.h"
 #include "util/assert.h"
 #include "util/db/dbconnectionpooled.h"
 #include "util/logger.h"
@@ -78,7 +80,12 @@ Library::Library(
           m_pMixxxLibraryFeature(nullptr),
           m_pPlaylistFeature(nullptr),
           m_pCrateFeature(nullptr),
-          m_pAnalysisFeature(nullptr) {
+          m_pAnalysisFeature(nullptr),
+          m_pCurrentTrackModel(nullptr),
+          m_trackCursorEpoch(0),
+          m_trackCursorTrackModelKey(""),
+          m_trackCursorListCached(false),
+          m_trackCursorCachedModel(nullptr) {
     qRegisterMetaType<LibraryRemovalType>("LibraryRemovalType");
 
     m_pKeyNotation.reset(
@@ -382,11 +389,11 @@ void Library::bindLibraryWidget(
     connect(pTrackTableView,
             &WTrackTableView::loadTrack,
             this,
-            &Library::slotLoadTrack);
+            &Library::slotLoadTrackDirect);
     connect(pTrackTableView,
             &WTrackTableView::loadTrackToPlayer,
             this,
-            &Library::slotLoadTrackToPlayer);
+            &Library::slotLoadTrackToPlayerDirect);
     pLibraryWidget->registerView(m_sTrackViewName, pTrackTableView);
 
     connect(this,
@@ -443,6 +450,10 @@ void Library::addFeature(LibraryFeature* feature) {
     m_features.push_back(feature);
     m_pSidebarModel->addLibraryFeature(feature);
     connect(feature,
+            &LibraryFeature::willUnloadTrackModel,
+            this,
+            &Library::slotWillUnloadTrackModel);
+    connect(feature,
             &LibraryFeature::showTrackModel,
             this,
             &Library::slotShowTrackModel);
@@ -453,11 +464,11 @@ void Library::addFeature(LibraryFeature* feature) {
     connect(feature,
             &LibraryFeature::loadTrack,
             this,
-            &Library::slotLoadTrack);
+            &Library::slotLoadTrackDirect);
     connect(feature,
             &LibraryFeature::loadTrackToPlayer,
             this,
-            &Library::slotLoadTrackToPlayer);
+            &Library::slotLoadTrackToPlayerDirect);
     connect(feature,
             &LibraryFeature::restoreSearch,
             this,
@@ -489,12 +500,54 @@ void Library::onPlayerManagerTrackAnalyzerIdle() {
     }
 }
 
-void Library::slotShowTrackModel(QAbstractItemModel* model) {
-    //qDebug() << "Library::slotShowTrackModel" << model;
+void Library::slotWillUnloadTrackModel(QAbstractItemModel* model) {
+    if (!model) {
+        return;
+    }
     TrackModel* trackModel = dynamic_cast<TrackModel*>(model);
     VERIFY_OR_DEBUG_ASSERT(trackModel) {
         return;
     }
+    QString trackModelKey = trackModel->getTrackModelKey();
+    if (trackModelKey != m_trackCursorTrackModelKey || m_trackCursorListCached) {
+        return;
+    }
+    m_trackCursorListCached = true;
+    m_trackCursorCachedList.clear();
+    m_trackCursorCachedModel = nullptr;
+
+    if (trackModel->isModelGlobal()) {
+        qDebug() << "Caching track list model (for " << trackModelKey << ").";
+        m_trackCursorCachedModel = trackModel;
+    } else {
+        int rowCount = model->rowCount();
+        qDebug() << "Caching track list (" << rowCount << " entries for " << trackModelKey << ").";
+        for (int i = 0; i < rowCount; ++i) {
+            TrackId trackId = trackModel->getTrackId(model->index(i, 0));
+            m_trackCursorCachedList.append(trackId);
+        }
+    }
+}
+
+void Library::slotShowTrackModel(QAbstractItemModel* model) {
+    //qDebug() << "Library::slotShowTrackModel" << model;
+    slotWillUnloadTrackModel(dynamic_cast<QAbstractItemModel*>(m_pCurrentTrackModel));
+
+    TrackModel* trackModel = dynamic_cast<TrackModel*>(model);
+    VERIFY_OR_DEBUG_ASSERT(trackModel) {
+        return;
+    }
+    m_pCurrentTrackModel = trackModel;
+
+    if (m_trackCursorListCached) {
+        if (trackModel->getTrackModelKey() == m_trackCursorTrackModelKey) {
+            qDebug() << "Dumping cached track list (" << m_trackCursorCachedList.size() << " entries for " << m_trackCursorTrackModelKey << ").";
+            m_trackCursorListCached = false;
+            m_trackCursorCachedList.clear();
+            m_trackCursorCachedModel = nullptr;
+        }
+    }
+
     emit showTrackModel(model);
     emit switchToView(m_sTrackViewName);
     emit restoreSearch(trackModel->currentSearch());
@@ -505,21 +558,162 @@ void Library::slotSwitchToView(const QString& view) {
     emit switchToView(view);
 }
 
-void Library::slotLoadTrack(TrackPointer pTrack) {
-    emit loadTrack(pTrack);
+TrackCursor Library::makeTrackCursor(TrackPointer pTrack) {
+    QString currentTrackModelKey = m_pCurrentTrackModel ? m_pCurrentTrackModel->getTrackModelKey() : QString();
+
+    ++m_trackCursorEpoch;
+    int currentEpoch = m_trackCursorEpoch;
+    m_trackCursorTrackModelKey = currentTrackModelKey;
+    m_trackCursorListCached = false;
+    m_trackCursorCachedList.clear();
+    m_trackCursorCachedModel = nullptr;
+
+    int initialIndex = -1;
+    if (m_pCurrentTrackModel && pTrack) {
+        QVector<int> rowIndexes = m_pCurrentTrackModel->getTrackRows(pTrack->getId());
+        if (rowIndexes.size() > 0) {
+            initialIndex = rowIndexes[0];
+        }
+    }
+
+    return TrackCursor {
+        .Track = pTrack,
+        .TrackIndex = initialIndex,
+        .LastTrackOffset = 0,
+        .IsActive = [this, currentEpoch, currentTrackModelKey](const TrackCursor& cursor) {
+            (void)cursor;
+            if (currentEpoch != m_trackCursorEpoch || currentTrackModelKey != m_trackCursorTrackModelKey) {
+                return false;
+            }
+            return true;
+        },
+        .GetTrackWithOffset = [this, currentEpoch, currentTrackModelKey](const TrackCursor& cursor, int offset) {
+            TrackCursor newCursor = {
+                .Track = nullptr,
+                .TrackIndex = 0,
+                .LastTrackOffset = offset,
+                .IsActive = cursor.IsActive,
+                .GetTrackWithOffset = cursor.GetTrackWithOffset,
+            };
+            if (currentEpoch != m_trackCursorEpoch || currentTrackModelKey != m_trackCursorTrackModelKey) {
+                return newCursor;
+            }
+
+            TrackModel* currentTrackModel = m_pCurrentTrackModel;
+            if (m_trackCursorListCached && m_trackCursorCachedModel) {
+                currentTrackModel = m_trackCursorCachedModel;
+                qDebug() << "Loading track from cached model (" << m_trackCursorCachedModel->getTrackModelKey() << ").";
+            } else if (m_trackCursorListCached) {
+                qDebug() << "Loading track from cached list (" << m_trackCursorCachedList.size() << " entries).";
+                int oldCachedTrackIndex = cursor.TrackIndex;
+                int nextCachedTrackIndex = 0;
+                bool hadNextCachedTrack = false;
+                if (cursor.Track) {
+                    TrackId trackId = cursor.Track->getId();
+                    if (oldCachedTrackIndex >= 0 && oldCachedTrackIndex < m_trackCursorCachedList.size()) {
+                        if (m_trackCursorCachedList[oldCachedTrackIndex] == trackId) {
+                            hadNextCachedTrack = true;
+                            nextCachedTrackIndex = oldCachedTrackIndex + offset;
+                        }
+                    }
+                    if (!hadNextCachedTrack) {
+                        int findIndex = m_trackCursorCachedList.indexOf(trackId);
+                        if (findIndex >= 0) {
+                            hadNextCachedTrack = true;
+                            nextCachedTrackIndex = findIndex + offset;
+                        }
+                    }
+                }
+                if (!hadNextCachedTrack) {
+                    nextCachedTrackIndex = cursor.TrackIndex + offset;
+                }
+                if (nextCachedTrackIndex < 0) {
+                    nextCachedTrackIndex = m_trackCursorCachedList.size() - 1;
+                }
+                if (nextCachedTrackIndex >= m_trackCursorCachedList.size()) {
+                    nextCachedTrackIndex = 0;
+                }
+                if (m_trackCursorCachedList.size() != 0) {
+                    TrackId nextTrackId = m_trackCursorCachedList[nextCachedTrackIndex];
+                    newCursor.Track = trackCollectionManager()->getTrackById(nextTrackId);
+                    newCursor.TrackIndex = nextCachedTrackIndex;
+                }
+                return newCursor;
+            }
+
+            QAbstractItemModel* itemModel = dynamic_cast<QAbstractItemModel*>(currentTrackModel);
+            if (!currentTrackModel || !itemModel) {
+                return newCursor;
+            }
+
+            int totalTrackCount = itemModel->rowCount();
+
+            int newTrackIndex;
+            TrackPointer pNewTrack = nullptr;
+            if (cursor.Track) {
+                TrackPointer pOldTrack = currentTrackModel->getTrack(itemModel->index(cursor.TrackIndex, 0));
+                if (pOldTrack == cursor.Track) {
+                    newTrackIndex = cursor.TrackIndex + offset;
+                    if (newTrackIndex < 0) {
+                        newTrackIndex = totalTrackCount - 1;
+                    }
+                    if (newTrackIndex >= totalTrackCount) {
+                        newTrackIndex = 0;
+                    }
+                    pNewTrack = currentTrackModel->getTrack(itemModel->index(newTrackIndex, 0));
+                } else {
+                    QVector<int> oldRowIndexes = currentTrackModel->getTrackRows(cursor.Track->getId());
+                    if (oldRowIndexes.size() > 0) {
+                        int initialIndex = oldRowIndexes[0];
+                        newTrackIndex = initialIndex + offset;
+                        if (newTrackIndex < 0) {
+                            newTrackIndex = totalTrackCount - 1;
+                        }
+                        if (newTrackIndex >= totalTrackCount) {
+                            newTrackIndex = 0;
+                        }
+                        pNewTrack = currentTrackModel->getTrack(itemModel->index(newTrackIndex, 0));
+                    }
+                }
+            }
+            if (!pNewTrack) {
+                newTrackIndex = offset < 0 ? (totalTrackCount - 1) : 0;
+                pNewTrack = currentTrackModel->getTrack(itemModel->index(newTrackIndex, 0));
+            }
+            if (!pNewTrack) {
+                newTrackIndex = 0;
+                pNewTrack = currentTrackModel->getTrack(itemModel->index(0, 0));
+            }
+            newCursor.Track = pNewTrack;
+            newCursor.TrackIndex = newTrackIndex;
+            return newCursor;
+        },
+    };
+}
+
+void Library::slotLoadTrackDirect(TrackPointer pTrack) {
+    slotLoadTrack(makeTrackCursor(pTrack));
+}
+
+void Library::slotLoadTrackToPlayerDirect(TrackPointer pTrack, const QString& group, bool play) {
+    slotLoadTrackToPlayer(makeTrackCursor(pTrack), group, play);
+}
+
+void Library::slotLoadTrack(TrackCursor cursor) {
+    emit loadTrack(cursor);
 }
 
 void Library::slotLoadLocationToPlayer(const QString& location, const QString& group) {
     auto trackRef = TrackRef::fromFilePath(location);
     TrackPointer pTrack = m_pTrackCollectionManager->getOrAddTrack(trackRef);
     if (pTrack) {
-        emit loadTrackToPlayer(pTrack, group);
+        emit loadTrackToPlayer(TrackCursor { .Track = pTrack }, group);
     }
 }
 
 void Library::slotLoadTrackToPlayer(
-        TrackPointer pTrack, const QString& group, bool play) {
-    emit loadTrackToPlayer(pTrack, group, play);
+        TrackCursor cursor, const QString& group, bool play) {
+    emit loadTrackToPlayer(cursor, group, play);
 }
 
 void Library::slotRefreshLibraryModels() {

@@ -106,6 +106,8 @@ class EngineBuffer : public EngineObject {
 
     // Queues a new seek position. Use SEEK_EXACT or SEEK_STANDARD as seekType
     void queueNewPlaypos(mixxx::audio::FramePos newpos, enum SeekRequest seekType);
+    void seekToCuePoint();
+    void seekToSeekOnLoadPosition();
     void requestSyncPhase();
     void requestEnableSync(bool enabled);
     void requestSyncMode(SyncMode mode);
@@ -122,6 +124,9 @@ class EngineBuffer : public EngineObject {
 
     bool isTrackLoaded() const;
     TrackPointer getLoadedTrack() const;
+    TrackCursor getLoadedTrackCursor() const;
+
+    bool isPlaying = false;
 
     mixxx::audio::FramePos getExactPlayPos() const;
     double getVisualPlayPos() const;
@@ -155,7 +160,7 @@ class EngineBuffer : public EngineObject {
     // Request that the EngineBuffer load a track. Since the process is
     // asynchronous, EngineBuffer will emit a trackLoaded signal when the load
     // has completed.
-    void loadTrack(TrackPointer pTrack, bool play);
+    void loadTrack(TrackCursor cursor, bool play);
 
     void setChannelIndex(int channelIndex) {
         m_channelIndex = channelIndex;
@@ -173,12 +178,14 @@ class EngineBuffer : public EngineObject {
     void slotControlEnd(double);
     void slotControlSeek(double);
     void slotKeylockEngineChanged(double);
+    void slotEngineWakeRequested();
 
     void slotEjectTrack(double);
 
   signals:
     void trackLoaded(TrackPointer pNewTrack, TrackPointer pOldTrack);
     void trackLoadFailed(TrackPointer pTrack, const QString& reason);
+    void trackWantsLoadNextTrack(TrackCursor cursor);
 
   private slots:
     void slotTrackLoading();
@@ -203,7 +210,7 @@ class EngineBuffer : public EngineObject {
     void enableIndependentPitchTempoScaling(bool bEnable,
                                             const int iBufferSize);
 
-    void updateIndicators(double rate, int iBufferSize);
+    void updateIndicators(double rate, int iBufferSize, bool forceUpdate);
 
     void hintReader(const double rate);
 
@@ -242,6 +249,7 @@ class EngineBuffer : public EngineObject {
     // Holds the name of the control group
     const QString m_group;
     int m_channelIndex;
+    EngineMaster* m_pEngineMaster;
 
     UserSettingsPointer m_pConfig;
 
@@ -343,6 +351,7 @@ class EngineBuffer : public EngineObject {
     ControlObject* m_pMasterRate;
     ControlPotmeter* m_playposSlider;
     ControlProxy* m_pSampleRate;
+    ControlProxy* m_pUseSimplePlayer;
     ControlProxy* m_pKeylockEngine;
     ControlPushButton* m_pKeylock;
 
@@ -404,6 +413,8 @@ class EngineBuffer : public EngineObject {
     mixxx::audio::SampleRate m_sampleRate;
 
     TrackPointer m_pCurrentTrack;
+    TrackCursor m_loadingTrackCursor;
+    TrackCursor m_currentTrackCursor;
 #ifdef __SCALER_DEBUG__
     QFile df;
     QTextStream writer;

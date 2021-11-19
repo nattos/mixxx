@@ -204,6 +204,9 @@ class CueControl : public EngineControl {
     SeekOnLoadMode getSeekOnLoadPreference();
     void trackLoaded(TrackPointer pNewTrack) override;
     void trackBeatsUpdated(mixxx::BeatsPointer pBeats) override;
+    void seekToSeekOnLoadPosition();
+
+    void seekToCuePoint();
 
   public slots:
     void slotLoopReset();
@@ -216,6 +219,7 @@ class CueControl : public EngineControl {
     void cueUpdated();
     void trackAnalyzed();
     void trackCuesUpdated();
+    void slotTrackSaveCuePointsChanged(bool v);
     void hotcueSet(HotcueControl* pControl, double v, HotcueSetMode mode);
     void hotcueGoto(HotcueControl* pControl, double v);
     void hotcueGotoAndPlay(HotcueControl* pControl, double v);
@@ -244,6 +248,7 @@ class CueControl : public EngineControl {
     FRIEND_TEST(CueControlTest, SeekOnSetCuePlay);
     void cuePlay(double v);
     void cueDefault(double v);
+    void slotCueDirtyChangeRequest(double v);
     void pause(double v);
     void playStutter(double v);
 
@@ -314,6 +319,8 @@ class CueControl : public EngineControl {
     ControlPushButton* m_pCuePlay;
     ControlPushButton* m_pCueGotoAndStop;
     ControlPushButton* m_pCuePreview;
+    ControlPushButton* m_pCueDirty;
+    ControlProxy* m_pEditCuePoints;
 
     ControlObject* m_pIntroStartPosition;
     ControlObject* m_pIntroStartEnabled;
