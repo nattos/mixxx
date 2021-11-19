@@ -285,7 +285,7 @@ void AnalyzerBeats::storeResults(TrackPointer pTrack) {
         }
     }
 
-    pTrack->trySetBeats(pBeats);
+    pTrack->trySetBeats(pBeats, true);
 }
 
 // static

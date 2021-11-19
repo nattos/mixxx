@@ -249,6 +249,8 @@ class CueControl : public EngineControl {
     void cuePlay(double v);
     void cueDefault(double v);
     void slotCueDirtyChangeRequest(double v);
+    void slotCueDirtyChanged(double v);
+    void slotEditCuePointsChanged(double v);
     void pause(double v);
     void playStutter(double v);
 
@@ -284,6 +286,8 @@ class CueControl : public EngineControl {
     void seekOnLoad(mixxx::audio::FramePos seekOnLoadPosition);
     void setHotcueFocusIndex(int hotcueIndex);
     int getHotcueFocusIndex() const;
+
+    void updateCueShowDirty();
 
     UserSettingsPointer m_pConfig;
     ColorPaletteSettings m_colorPaletteSettings;
@@ -321,6 +325,7 @@ class CueControl : public EngineControl {
     ControlPushButton* m_pCuePreview;
     ControlPushButton* m_pCueDirty;
     ControlProxy* m_pEditCuePoints;
+    ControlPushButton* m_pCueShowDirty;
 
     ControlObject* m_pIntroStartPosition;
     ControlObject* m_pIntroStartEnabled;

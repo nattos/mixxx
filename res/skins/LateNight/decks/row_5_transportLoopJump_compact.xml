@@ -109,7 +109,7 @@
               <ConfigKey><Variable name="Group"/>,cue_dirty</ConfigKey>
             </Connection>
             <Connection>
-              <ConfigKey persist="true">[Controls],AutoPersistCues</ConfigKey>
+              <ConfigKey><Variable name="Group"/>,cue_showdirty</ConfigKey>
               <BindProperty>visible</BindProperty>
             </Connection>
           </PushButton>

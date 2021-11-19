@@ -393,18 +393,19 @@ bool Track::trySetBpm(mixxx::Bpm bpm) {
     if (!trySetBpmWhileLocked(bpm)) {
         return false;
     }
-    afterBeatsAndBpmUpdated(&locked);
+    afterBeatsAndBpmUpdated(&locked, true);
+    setSaveCuePoints(true);
     return true;
 }
 
-bool Track::trySetBeats(mixxx::BeatsPointer pBeats) {
+bool Track::trySetBeats(mixxx::BeatsPointer pBeats, bool persist) {
     auto locked = lockMutex(&m_qMutex);
-    return trySetBeatsMarkDirtyAndUnlock(&locked, pBeats, false);
+    return trySetBeatsMarkDirtyAndUnlock(&locked, pBeats, false, persist);
 }
 
-bool Track::trySetAndLockBeats(mixxx::BeatsPointer pBeats) {
+bool Track::trySetAndLockBeats(mixxx::BeatsPointer pBeats, bool persist) {
     auto locked = lockMutex(&m_qMutex);
-    return trySetBeatsMarkDirtyAndUnlock(&locked, pBeats, true);
+    return trySetBeatsMarkDirtyAndUnlock(&locked, pBeats, true, persist);
 }
 
 bool Track::setBeatsWhileLocked(mixxx::BeatsPointer pBeats) {
@@ -438,14 +439,15 @@ bool Track::trySetBeatsWhileLocked(
 bool Track::trySetBeatsMarkDirtyAndUnlock(
         QT_RECURSIVE_MUTEX_LOCKER* pLock,
         mixxx::BeatsPointer pBeats,
-        bool lockBpmAfterSet) {
+        bool lockBpmAfterSet,
+        bool persist) {
     DEBUG_ASSERT(pLock);
 
     if (!trySetBeatsWhileLocked(pBeats, lockBpmAfterSet)) {
         return false;
     }
 
-    afterBeatsAndBpmUpdated(pLock);
+    afterBeatsAndBpmUpdated(pLock, persist);
     return true;
 }
 
@@ -455,11 +457,14 @@ mixxx::BeatsPointer Track::getBeats() const {
 }
 
 void Track::afterBeatsAndBpmUpdated(
-        QT_RECURSIVE_MUTEX_LOCKER* pLock) {
+        QT_RECURSIVE_MUTEX_LOCKER* pLock, bool persist) {
     DEBUG_ASSERT(pLock);
 
     markDirtyAndUnlock(pLock);
     emitBeatsAndBpmUpdated();
+    if (persist) {
+        setSaveCuePoints(true);
+    }
 }
 
 void Track::emitBeatsAndBpmUpdated() {
@@ -1097,7 +1102,8 @@ Track::ImportStatus Track::tryImportBeats(
         // to be replaced with the imported beats soon.
         if (trySetBeatsMarkDirtyAndUnlock(&locked,
                     nullptr,
-                    lockBpmAfterSet)) {
+                    lockBpmAfterSet,
+                    true)) {
             return ImportStatus::Pending;
         } else {
             return ImportStatus::Complete;
@@ -1159,7 +1165,7 @@ bool Track::tryImportPendingBeatsMarkDirtyAndUnlock(
         return true;
     }
 
-    afterBeatsAndBpmUpdated(pLock);
+    afterBeatsAndBpmUpdated(pLock, true);
     return true;
 }
 
@@ -1722,7 +1728,7 @@ void Track::updateStreamInfoFromSource(
     }
 
     if (beatsImported) {
-        afterBeatsAndBpmUpdated(&locked);
+        afterBeatsAndBpmUpdated(&locked, true);
     } else {
         markDirtyAndUnlock(&locked);
         emit durationChanged();

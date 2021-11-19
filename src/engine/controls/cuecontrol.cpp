@@ -160,8 +160,16 @@ CueControl::CueControl(const QString& group,
     m_pCueDirty = new ControlPushButton(ConfigKey(group, "cue_dirty"));
     m_pCueDirty->setButtonMode(ControlPushButton::TOGGLE);
     m_pCueDirty->connectValueChangeRequest(this, &CueControl::slotCueDirtyChangeRequest);
+    connect(m_pCueDirty, &ControlObject::valueChanged,
+            this, &CueControl::slotCueDirtyChanged,
+            Qt::DirectConnection);
 
     m_pEditCuePoints = new ControlProxy("[Controls]", "AutoPersistCues");
+    m_pEditCuePoints->connectValueChanged(
+            this, &CueControl::slotEditCuePointsChanged,
+            Qt::DirectConnection);
+    m_pCueShowDirty = new ControlPushButton(ConfigKey(group, "cue_showdirty"));
+    m_pCueShowDirty->setButtonMode(ControlPushButton::PUSH);
 
     m_pPlayStutter = new ControlPushButton(ConfigKey(group, "play_stutter"));
     connect(m_pPlayStutter, &ControlObject::valueChanged,
@@ -290,6 +298,7 @@ CueControl::~CueControl() {
     delete m_pCueGotoAndStop;
     delete m_pCuePreview;
     delete m_pEditCuePoints;
+    delete m_pCueShowDirty;
     delete m_pCueCDJ;
     delete m_pCueDefault;
     delete m_pCueDirty;
@@ -444,6 +453,7 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
         m_pLoadedTrack.reset();
         m_usedSeekOnLoadPosition.setValue(mixxx::audio::kStartFramePos);
         m_pCueDirty->forceSet(false);
+        updateCueShowDirty();
     }
 
     if (!pNewTrack) {
@@ -464,6 +474,7 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
             Qt::DirectConnection);
 
     m_pCueDirty->forceSet(m_pLoadedTrack->isSaveCuePoints() != 0.);
+    updateCueShowDirty();
     connect(m_pLoadedTrack.get(),
             &Track::saveCuePointsChanged,
             this,
@@ -1506,15 +1517,28 @@ void CueControl::cueDefault(double v) {
 }
 
 void CueControl::slotCueDirtyChangeRequest(double v) {
-    qDebug() << "CueControl::slotCueDirtyChangeRequest:" <<  v;
     if (m_pLoadedTrack) {
         m_pLoadedTrack->setSaveCuePoints(v != 0.);
     }
 }
 
+void CueControl::slotCueDirtyChanged(double) {
+    updateCueShowDirty();
+}
+
+void CueControl::slotEditCuePointsChanged(double) {
+    updateCueShowDirty();
+}
+
+void CueControl::updateCueShowDirty() {
+    bool isEditCuePoints = m_pEditCuePoints->get() != 0.;
+    bool isCueDirty = m_pCueDirty->get() != 0.;
+    m_pCueShowDirty->set((isEditCuePoints || isCueDirty) ? 1. : 0.);
+}
+
 void CueControl::slotTrackSaveCuePointsChanged(bool v) {
-    qDebug() << "CueControl::slotTrackSaveCuePointsChanged:" <<  v;
     m_pCueDirty->setAndConfirm(v);
+    updateCueShowDirty();
 }
 
 void CueControl::pause(double v) {

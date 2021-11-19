@@ -111,6 +111,8 @@ BpmControl::BpmControl(const QString& group,
             this, &BpmControl::slotBpmTap,
             Qt::DirectConnection);
 
+    m_pEditCuePoints.reset(new ControlProxy("[Controls]", "AutoPersistCues"));
+
     m_pTranslateBeats = new ControlPushButton(ConfigKey(group, "beats_translate_curpos"));
     connect(m_pTranslateBeats, &ControlObject::valueChanged,
             this, &BpmControl::slotBeatsTranslate,
@@ -167,7 +169,8 @@ void BpmControl::adjustBeatsBpm(double deltaBpm) {
     if (!newBeats) {
         return;
     }
-    pTrack->trySetBeats(*newBeats);
+    bool isPersistCues = m_pEditCuePoints->get() != 0.;
+    pTrack->trySetBeats(*newBeats, isPersistCues);
 }
 
 void BpmControl::slotAdjustBeatsFaster(double v) {
@@ -198,7 +201,8 @@ void BpmControl::slotTranslateBeatsEarlier(double v) {
         const mixxx::audio::FrameDiff_t frameOffset = sampleOffset / mixxx::kEngineChannelCount;
         const auto translatedBeats = pBeats->tryTranslate(frameOffset);
         if (translatedBeats) {
-            pTrack->trySetBeats(*translatedBeats);
+            bool isPersistCues = m_pEditCuePoints->get() != 0.;
+            pTrack->trySetBeats(*translatedBeats, isPersistCues);
         }
     }
 }
@@ -218,7 +222,8 @@ void BpmControl::slotTranslateBeatsLater(double v) {
         const mixxx::audio::FrameDiff_t frameOffset = sampleOffset / mixxx::kEngineChannelCount;
         const auto translatedBeats = pBeats->tryTranslate(frameOffset);
         if (translatedBeats) {
-            pTrack->trySetBeats(*translatedBeats);
+            bool isPersistCues = m_pEditCuePoints->get() != 0.;
+            pTrack->trySetBeats(*translatedBeats, isPersistCues);
         }
     }
 }
@@ -260,7 +265,8 @@ void BpmControl::slotTapFilter(double averageLength, int numSamples) {
     if (!newBeats) {
         return;
     }
-    pTrack->trySetBeats(*newBeats);
+    bool isPersistCues = m_pEditCuePoints->get() != 0.;
+    pTrack->trySetBeats(*newBeats, isPersistCues);
 }
 
 // static
@@ -985,7 +991,8 @@ void BpmControl::slotBeatsTranslate(double v) {
         const mixxx::audio::FrameDiff_t frameOffset = currentPosition - closestBeat;
         const auto translatedBeats = pBeats->tryTranslate(frameOffset);
         if (translatedBeats) {
-            pTrack->trySetBeats(*translatedBeats);
+            bool isPersistCues = m_pEditCuePoints->get() != 0.;
+            pTrack->trySetBeats(*translatedBeats, isPersistCues);
         }
     }
 }
@@ -1007,7 +1014,8 @@ void BpmControl::slotBeatsTranslateMatchAlignment(double v) {
         const mixxx::audio::FrameDiff_t frameOffset = -getPhaseOffset(frameInfo().currentPosition);
         const auto translatedBeats = pBeats->tryTranslate(frameOffset);
         if (translatedBeats) {
-            pTrack->trySetBeats(*translatedBeats);
+            bool isPersistCues = m_pEditCuePoints->get() != 0.;
+            pTrack->trySetBeats(*translatedBeats, isPersistCues);
         }
     }
 }

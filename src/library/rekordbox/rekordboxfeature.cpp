@@ -944,7 +944,7 @@ void readAnalyze(TrackPointer track,
                     sampleRate,
                     beats,
                     mixxx::rekordboxconstants::beatsSubversion);
-            track->trySetBeats(pBeats);
+            track->trySetBeats(pBeats, false);
         } break;
         case rekordbox_anlz_t::SECTION_TAGS_CUES: {
             if (ignoreCues) {

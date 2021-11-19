@@ -150,6 +150,7 @@ class BpmControl : public EngineControl {
 
     // Used for bpm tapping from GUI and MIDI
     ControlPushButton* m_pButtonTap;
+    QScopedPointer<ControlProxy> m_pEditCuePoints;
 
     // Button that translates the beats so the nearest beat is on the current
     // playposition.

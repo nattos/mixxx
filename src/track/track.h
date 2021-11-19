@@ -356,8 +356,8 @@ class Track : public QObject {
     mixxx::BeatsPointer getBeats() const;
 
     // Set the track's Beats if not locked
-    bool trySetBeats(mixxx::BeatsPointer pBeats);
-    bool trySetAndLockBeats(mixxx::BeatsPointer pBeats);
+    bool trySetBeats(mixxx::BeatsPointer pBeats, bool persist);
+    bool trySetAndLockBeats(mixxx::BeatsPointer pBeats, bool persist);
 
     /// Imports the given list of cue infos as cue points,
     /// thereby replacing all existing cue points!
@@ -487,7 +487,7 @@ class Track : public QObject {
 
     void afterKeysUpdated(QT_RECURSIVE_MUTEX_LOCKER* pLock);
 
-    void afterBeatsAndBpmUpdated(QT_RECURSIVE_MUTEX_LOCKER* pLock);
+    void afterBeatsAndBpmUpdated(QT_RECURSIVE_MUTEX_LOCKER* pLock, bool persist);
     void emitBeatsAndBpmUpdated();
 
     /// Emits a changed signal for each Q_PROPERTY
@@ -520,7 +520,8 @@ class Track : public QObject {
     bool trySetBeatsMarkDirtyAndUnlock(
             QT_RECURSIVE_MUTEX_LOCKER* pLock,
             mixxx::BeatsPointer pBeats,
-            bool lockBpmAfterSet);
+            bool lockBpmAfterSet,
+            bool persist);
     bool tryImportPendingBeatsMarkDirtyAndUnlock(
             QT_RECURSIVE_MUTEX_LOCKER* pLock,
             bool lockBpmAfterSet);

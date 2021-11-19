@@ -1246,17 +1246,17 @@ bool setTrackBeats(const QSqlRecord& record, const int column, Track* pTrack) {
             pTrack->getSampleRate(), beatsVersion, beatsSubVersion, beatsBlob);
     if (pBeats) {
         if (bpmLocked) {
-            pTrack->trySetAndLockBeats(pBeats);
+            pTrack->trySetAndLockBeats(pBeats, false);
         } else {
-            pTrack->trySetBeats(pBeats);
+            pTrack->trySetBeats(pBeats, false);
         }
     } else if (bpm.isValid()) {
         // Load a temporary beat grid without offset that will be replaced by the analyzer.
         const auto pBeats = mixxx::Beats::fromConstTempo(
                 pTrack->getSampleRate(), mixxx::audio::kStartFramePos, bpm);
-        pTrack->trySetBeats(pBeats);
+        pTrack->trySetBeats(pBeats, false);
     } else {
-        pTrack->trySetBeats(nullptr);
+        pTrack->trySetBeats(nullptr, false);
     }
     return false;
 }
@@ -1636,7 +1636,7 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             "key=:key,"
             "key_id=:key_id,") +
             (isSaveCuePoints ? "cuepoint=:cuepoint," : "") +
-            "bpm=:bpm,"
+            (isSaveCuePoints ? "bpm=:bpm," : "") +
             "replaygain=:replaygain,"
             "replaygain_peak=:replaygain_peak,"
             "timesplayed=:timesplayed,"
@@ -1648,11 +1648,13 @@ bool TrackDAO::updateTrack(Track* pTrack) const {
             "bitrate=:bitrate,"
             "samplerate=:samplerate,"
             "bitrate=:bitrate,"
-            "duration=:duration,"
-            "beats_version=:beats_version,"
-            "beats_sub_version=:beats_sub_version,"
-            "beats=:beats,"
-            "bpm_lock=:bpm_lock,"
+            "duration=:duration," +
+            (isSaveCuePoints ? (
+                "beats_version=:beats_version,"
+                "beats_sub_version=:beats_sub_version,"
+                "beats=:beats,"
+                "bpm_lock=:bpm_lock," )
+                : "") +
             "keys_version=:keys_version,"
             "keys_sub_version=:keys_sub_version,"
             "keys=:keys,"
