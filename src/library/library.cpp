@@ -81,6 +81,7 @@ Library::Library(
           m_pPlaylistFeature(nullptr),
           m_pCrateFeature(nullptr),
           m_pAnalysisFeature(nullptr),
+          m_pLibraryWidget(nullptr),
           m_pCurrentTrackModel(nullptr),
           m_trackCursorEpoch(0),
           m_trackCursorTrackModelKey(""),
@@ -376,6 +377,7 @@ void Library::bindSidebarWidget(WLibrarySidebar* pSidebarWidget) {
 
 void Library::bindLibraryWidget(
         WLibrary* pLibraryWidget, KeyboardEventFilter* pKeyboard) {
+    m_pLibraryWidget = pLibraryWidget;
     WTrackTableView* pTrackTableView = new WTrackTableView(pLibraryWidget,
             m_pConfig,
             this,
@@ -594,6 +596,7 @@ TrackCursor Library::makeTrackCursor(TrackPointer pTrack) {
                 .LastTrackOffset = offset,
                 .IsActive = cursor.IsActive,
                 .GetTrackWithOffset = cursor.GetTrackWithOffset,
+                .OnTrackLoaded = cursor.OnTrackLoaded,
             };
             if (currentEpoch != m_trackCursorEpoch || currentTrackModelKey != m_trackCursorTrackModelKey) {
                 return newCursor;
@@ -687,6 +690,34 @@ TrackCursor Library::makeTrackCursor(TrackPointer pTrack) {
             newCursor.Track = pNewTrack;
             newCursor.TrackIndex = newTrackIndex;
             return newCursor;
+        },
+        .OnTrackLoaded = [this, currentEpoch, currentTrackModelKey](const TrackCursor& cursor) {
+            if (!m_pLibraryWidget || !cursor.Track) {
+                return;
+            }
+            if (currentEpoch != m_trackCursorEpoch || currentTrackModelKey != m_trackCursorTrackModelKey) {
+                return;
+            }
+
+            TrackModel* currentTrackModel = m_pCurrentTrackModel;
+            if (m_trackCursorListCached && m_trackCursorCachedModel) {
+                currentTrackModel = m_trackCursorCachedModel;
+                // qDebug() << "Loading track from cached model (" << m_trackCursorCachedModel->getTrackModelKey() << ").";
+            } else if (m_trackCursorListCached) {
+                // qDebug() << "Loading track from cached list (" << m_trackCursorCachedList.size() << " entries).";
+                return;
+            }
+
+            QAbstractItemModel* itemModel = dynamic_cast<QAbstractItemModel*>(currentTrackModel);
+            if (!currentTrackModel || !itemModel) {
+                return;
+            }
+
+            WTrackTableView* tableView = dynamic_cast<WTrackTableView*>(m_pLibraryWidget->getActiveView());
+            if (tableView->getSelectedTrackIds().size() > 1) {
+                return;
+            }
+            tableView->setFocusedTrack(cursor.Track->getId(), cursor.TrackIndex, true);
         },
     };
 }

@@ -480,7 +480,7 @@ void BaseTrackPlayerImpl::slotLoadFailed(TrackPointer pTrack, const QString& rea
         }
         // Delay invocation so we don't endlessly try playing errored tracks.
         // Note: This behaves badly when hammering UI buttons.
-        QTimer::singleShot(1, this, [this, cursor, offset, pTrack] {
+        QTimer::singleShot(100, this, [this, cursor, offset] {
             if (!m_pLoadedTrack) {
                 slotLoadTrack(cursor.GetTrackWithOffset(cursor, offset), true);
             }
@@ -604,6 +604,12 @@ void BaseTrackPlayerImpl::slotTrackLoaded(TrackPointer pNewTrack,
     // Update the PlayerInfo class that is used in EngineBroadcast to replace
     // the metadata of a stream
     PlayerInfo::instance().setTrackInfo(getGroup(), m_pLoadedTrack);
+
+    // Notify the library widget.
+    TrackCursor cursor = m_loadedTrackCursor;
+    if (cursor.OnTrackLoaded) {
+        cursor.OnTrackLoaded(cursor);
+    }
 }
 
 TrackPointer BaseTrackPlayerImpl::getLoadedTrack() const {

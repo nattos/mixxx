@@ -1,6 +1,7 @@
 #include "sources/metadatasourcetaglib.h"
 
 #include <taglib/opusfile.h>
+#include <taglib/tfilestream.h>
 #include <taglib/vorbisfile.h>
 
 #include <QFile>
@@ -38,6 +39,10 @@ class AiffFile : public TagLib::RIFF::AIFF::File {
   public:
     explicit AiffFile(TagLib::FileName fileName)
             : TagLib::RIFF::AIFF::File(fileName) {
+    }
+
+    explicit AiffFile(TagLib::IOStream* stream)
+            : TagLib::RIFF::AIFF::File(stream) {
     }
 
     bool importTrackMetadataFromTextChunks(TrackMetadata* pTrackMetadata) /*non-const*/ {
@@ -110,9 +115,10 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
     // from the same tag types. Only the first available tag type
     // is read and data in subsequent tags is ignored.
 
+    TagLib::FileStream fileStream(TAGLIB_FILENAME_FROM_QSTRING(m_fileName), true);
     switch (m_fileType) {
     case taglib::FileType::MP3: {
-        TagLib::MPEG::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::MPEG::File file(&fileStream, TagLib::ID3v2::FrameFactory::instance());
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -143,7 +149,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::MP4: {
-        TagLib::MP4::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::MP4::File file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -157,7 +163,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::FLAC: {
-        TagLib::FLAC::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::FLAC::File file(&fileStream, TagLib::ID3v2::FrameFactory::instance());
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -194,7 +200,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::OGG: {
-        TagLib::Ogg::Vorbis::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::Ogg::Vorbis::File file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -207,7 +213,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::OPUS: {
-        TagLib::Ogg::Opus::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::Ogg::Opus::File file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -220,7 +226,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::WV: {
-        TagLib::WavPack::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::WavPack::File file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -234,7 +240,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::WAV: {
-        TagLib::RIFF::WAV::File file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        TagLib::RIFF::WAV::File file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }
@@ -253,7 +259,7 @@ MetadataSourceTagLib::importTrackMetadataAndCoverImage(
         break;
     }
     case taglib::FileType::AIFF: {
-        AiffFile file(TAGLIB_FILENAME_FROM_QSTRING(m_fileName));
+        AiffFile file(&fileStream);
         if (!taglib::readAudioPropertiesFromFile(pTrackMetadata, file)) {
             break;
         }

@@ -108,7 +108,7 @@ bool EngineDeck::isActive() {
     if (m_bPassthroughWasActive && !m_bPassthroughIsActive) {
         active = true;
     } else {
-        active = m_pBuffer->isTrackLoaded() || isPassthroughActive();
+        active = m_pBuffer->isTrackLoaded() || m_pBuffer->wantsForceProcess() || isPassthroughActive();
     }
 
     if (!active && m_wasActive) {

@@ -918,6 +918,39 @@ void WTrackTableView::setSelectedTracks(const QList<TrackId>& trackIds) {
     }
 }
 
+void WTrackTableView::setFocusedTrack(const TrackId& trackId, int rowHint, bool scrollIntoView) {
+    QItemSelectionModel* pSelectionModel = selectionModel();
+    VERIFY_OR_DEBUG_ASSERT(pSelectionModel != nullptr) {
+        qWarning() << "No selected tracks available";
+        return;
+    }
+
+    TrackModel* pTrackModel = getTrackModel();
+    VERIFY_OR_DEBUG_ASSERT(pTrackModel != nullptr) {
+        qWarning() << "No selected tracks available";
+        return;
+    }
+
+    QAbstractItemModel* itemModel = model();
+    QModelIndex index = itemModel->index(rowHint, 0);
+    TrackId hintTrackId = pTrackModel->getTrackId(index);
+    if (hintTrackId != trackId) {
+        const auto trackRows = pTrackModel->getTrackRows(trackId);
+        if (trackRows.size() <= 0) {
+            return;
+        }
+        int trackRow = trackRows[0];
+        index = itemModel->index(trackRow, 0);
+    }
+    if (scrollIntoView) {
+        // This seems to be broken since at least Qt 5.12: no scrolling is issued
+        // scrollTo(index, QAbstractItemView::EnsureVisible);
+        selectRow(index.row());
+    } else {
+        pSelectionModel->setCurrentIndex(index, QItemSelectionModel::ClearAndSelect | QItemSelectionModel::Rows);
+    }
+}
+
 void WTrackTableView::addToAutoDJ(PlaylistDAO::AutoDJSendLoc loc) {
     auto* trackModel = getTrackModel();
     if (!trackModel->hasCapabilities(TrackModel::Capability::AddToAutoDJ)) {

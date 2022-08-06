@@ -18,6 +18,7 @@ struct TrackCursor {
     int LastTrackOffset = 0;
     std::function<bool(const TrackCursor&)> IsActive;
     std::function<TrackCursor(const TrackCursor&, int)> GetTrackWithOffset;
+    std::function<void(const TrackCursor&)> OnTrackLoaded;
 };
 
 Q_DECLARE_METATYPE(TrackCursor);

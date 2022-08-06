@@ -42,6 +42,7 @@ class WTrackTableView : public WLibraryTableView {
     TrackModel::SortColumnId getColumnIdFromCurrentIndex() override;
     QList<TrackId> getSelectedTrackIds() const;
     void setSelectedTracks(const QList<TrackId>& tracks);
+    void setFocusedTrack(const TrackId& trackId, int rowHint, bool scrollIntoView=false);
     void saveCurrentVScrollBarPos();
     void restoreCurrentVScrollBarPos();
 

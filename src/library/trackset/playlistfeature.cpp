@@ -9,6 +9,7 @@
 #include "library/parser.h"
 #include "library/playlisttablemodel.h"
 #include "library/queryutil.h"
+#include "library/sidebarmodel.h"
 #include "library/trackcollection.h"
 #include "library/trackcollectionmanager.h"
 #include "library/treeitem.h"
@@ -48,6 +49,13 @@ PlaylistFeature::PlaylistFeature(Library* pLibrary, UserSettingsPointer pConfig)
     std::unique_ptr<TreeItem> pRootItem = TreeItem::newRoot(this);
     m_pSidebarModel->setRootItem(std::move(pRootItem));
     constructChildModel(kInvalidPlaylistId);
+}
+
+void PlaylistFeature::bindSidebarWidget(WLibrarySidebar* pSidebarWidget) {
+    BasePlaylistFeature::bindSidebarWidget(pSidebarWidget);
+    SidebarModel* model = qobject_cast<SidebarModel*>(m_pSidebarWidget->model());
+    QModelIndex index = model->getLibraryFeatureIndex(this);
+    m_pSidebarWidget->setExpanded(index, true);
 }
 
 QVariant PlaylistFeature::title() {

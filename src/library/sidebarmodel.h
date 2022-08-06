@@ -26,6 +26,7 @@ class SidebarModel : public QAbstractItemModel {
     ~SidebarModel() override = default;
 
     void addLibraryFeature(LibraryFeature* feature);
+    QModelIndex getLibraryFeatureIndex(LibraryFeature* feature);
     QModelIndex getDefaultSelection();
     void setDefaultSelection(unsigned int index);
     void activateDefaultSelection();

@@ -129,7 +129,7 @@ PlayerManager::PlayerManager(UserSettingsPointer pConfig,
     m_pPlayPauseTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_pause"));
     m_pPlayPauseTrack->setButtonMode(ControlPushButton::TOGGLE);
     m_pPlayPauseTrack->connectValueChangeRequest(this,
-            &PlayerManager::slotPlayPause, Qt::DirectConnection);
+            &PlayerManager::slotPlayTogglePause, Qt::DirectConnection);
     m_pPlayStopTrack = new ControlPushButton(ConfigKey("[Master]", "playlist_stop"));
     m_pPlayStopTrack->setButtonMode(ControlPushButton::PUSH);
     m_pPlayStopTrack->connectValueChangeRequest(this,
@@ -436,6 +436,11 @@ void PlayerManager::slotPlayPlayOrPause(double v) {
     setActiveDeckPlayState(PlayState::PlayOrPause);
 }
 
+void PlayerManager::slotPlayTogglePause(double) {
+    qDebug() << "slotPlayTogglePause";
+    setActiveDeckPlayState(PlayState::PauseToggle);
+}
+
 void PlayerManager::slotPlayPause(double) {
     qDebug() << "slotPlayPause";
     setActiveDeckPlayState(PlayState::Pause);
@@ -477,9 +482,14 @@ void PlayerManager::setActiveDeckPlayState(PlayState state) {
                         }
                     }
                     break;
-                case PlayState::Pause:
+                case PlayState::PauseToggle:
                     if (playControl) {
                         playControl->set(isPlaying ? 0. : 1.);
+                    }
+                    break;
+                case PlayState::Pause:
+                    if (playControl) {
+                        playControl->set(0.);
                     }
                     break;
                 case PlayState::Stop:

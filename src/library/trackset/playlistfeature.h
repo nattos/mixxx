@@ -24,6 +24,8 @@ class PlaylistFeature : public BasePlaylistFeature {
             UserSettingsPointer pConfig);
     ~PlaylistFeature() override = default;
 
+    void bindSidebarWidget(WLibrarySidebar* pSidebarWidget) override;
+
     QVariant title() override;
 
     bool dropAcceptChild(const QModelIndex& index,

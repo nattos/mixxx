@@ -123,6 +123,7 @@ class EngineBuffer : public EngineObject {
     mixxx::audio::FramePos queuedSeekPosition() const;
 
     bool isTrackLoaded() const;
+    bool wantsForceProcess() const;
     TrackPointer getLoadedTrack() const;
     TrackCursor getLoadedTrackCursor() const;
 
@@ -196,6 +197,7 @@ class EngineBuffer : public EngineObject {
     // Fired when passthrough mode is enabled or disabled.
     void slotPassthroughChanged(double v);
     void slotUpdatedTrackBeats();
+    void slotDoPlayAfterLoading();
 
   private:
     struct QueuedSeek {
@@ -362,6 +364,7 @@ class EngineBuffer : public EngineObject {
 
     ControlPushButton* m_pEject;
     ControlObject* m_pTrackLoaded;
+    bool m_bWantsForceProcess;
 
     // Whether or not to repeat the track when at the end
     ControlPushButton* m_pRepeat;
@@ -408,6 +411,7 @@ class EngineBuffer : public EngineObject {
     // Is true if the previous buffer was silent due to pausing
     QAtomicInt m_iTrackLoading;
     bool m_bPlayAfterLoading;
+    bool m_bHoldProcessingForPlayAfterLoading;
     // Records the sample rate so we can detect when it changes. Initialized to
     // 0 to guarantee we see a change on the first callback.
     mixxx::audio::SampleRate m_sampleRate;

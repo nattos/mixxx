@@ -88,6 +88,7 @@ EngineBuffer::EngineBuffer(const QString& group,
           m_slipPosition(mixxx::audio::kStartFramePos),
           m_dSlipRate(1.0),
           m_bSlipEnabledProcessing(false),
+          m_bWantsForceProcess(false),
           m_pRepeat(nullptr),
           m_startButton(nullptr),
           m_endButton(nullptr),
@@ -96,6 +97,7 @@ EngineBuffer::EngineBuffer(const QString& group,
           m_iEnableSyncQueued(SYNC_REQUEST_NONE),
           m_iSyncModeQueued(static_cast<int>(SyncMode::Invalid)),
           m_bPlayAfterLoading(false),
+          m_bHoldProcessingForPlayAfterLoading(false),
           m_pCrossfadeBuffer(SampleUtil::alloc(MAX_BUFFER_LEN)),
           m_bCrossfadeReady(false),
           m_iLastBufferSize(0) {
@@ -553,10 +555,14 @@ void EngineBuffer::slotTrackLoading() {
     m_iTrackLoading = 1;
     m_pause.unlock();
 
-    // Set play here, to signal the user that the play command is adopted
-    m_playButton->set((double)m_bPlayAfterLoading);
+    // Prepare to start playing.
     if (m_bPlayAfterLoading) {
+        m_playButton->set(1.);
+        m_bHoldProcessingForPlayAfterLoading = true;
         m_pEngineMaster->requestAwake();
+    } else {
+        m_playButton->set(0.);
+        m_bHoldProcessingForPlayAfterLoading = false;
     }
     setTrackEndPosition(mixxx::audio::kInvalidFramePos); // Stop renderer
 }
@@ -608,10 +614,24 @@ void EngineBuffer::slotTrackLoaded(TrackPointer pTrack,
     // Reset the pitch value for the new track.
     m_pause.unlock();
 
+    // Prepare again to start playing.
+    if (m_bPlayAfterLoading) {
+        m_pEngineMaster->requestAwake();
+        QTimer::singleShot(50, this, &EngineBuffer::slotDoPlayAfterLoading);
+    }
+
     notifyTrackLoaded(pTrack, pOldTrack);
     // Start buffer processing after all EngineContols are up to date
     // with the current track e.g track is seeked to Cue
     m_iTrackLoading = 0;
+}
+
+void EngineBuffer::slotDoPlayAfterLoading() {
+    // Actually start playing.
+    if (m_bPlayAfterLoading) {
+        m_bHoldProcessingForPlayAfterLoading = false;
+    }
+    m_bPlayAfterLoading = false;
 }
 
 // WARNING: Always called from the EngineWorker thread pool
@@ -655,6 +675,11 @@ void EngineBuffer::ejectTrack() {
         notifyTrackLoaded(TrackPointer(), pOldTrack);
     }
     m_iTrackLoading = 0;
+    m_bHoldProcessingForPlayAfterLoading = false;
+
+    // Force flushing of track unloaded FIFO events.
+    m_bWantsForceProcess = true;
+    m_pEngineMaster->requestAwake();
 }
 
 void EngineBuffer::notifyTrackLoaded(
@@ -871,7 +896,7 @@ void EngineBuffer::processTrackLocked(
     processSyncRequests();
 
     // Note: play is also active during cue preview
-    bool paused = !m_playButton->toBool();
+    bool paused = !m_playButton->toBool() || m_bHoldProcessingForPlayAfterLoading;
     KeyControl::PitchTempoRatio pitchTempoRatio = m_pKeyControl->getPitchTempoRatio();
 
     // The pitch adjustment in Ratio (1.0 being normal
@@ -1159,6 +1184,12 @@ void EngineBuffer::process(CSAMPLE* pOutput, const int iBufferSize) {
         return;
     }
     m_pReader->process();
+    if (m_bWantsForceProcess) {
+        m_bWantsForceProcess = false;
+        if (!m_pCurrentTrack) {
+            return;
+        }
+    }
     // Steps:
     // - Lookup new reader information
     // - Calculate current rate
@@ -1492,6 +1523,10 @@ bool EngineBuffer::isTrackLoaded() const {
         return true;
     }
     return false;
+}
+
+bool EngineBuffer::wantsForceProcess() const {
+    return m_bWantsForceProcess;
 }
 
 TrackPointer EngineBuffer::getLoadedTrack() const {

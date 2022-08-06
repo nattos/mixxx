@@ -58,6 +58,7 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     enum class PlayState {
         PlayOrPause,
         Play,
+        PauseToggle,
         Pause,
         Stop,
     };
@@ -214,6 +215,7 @@ class PlayerManager : public QObject, public PlayerManagerInterface {
     void slotPlayNextTrack(double v);
     void slotPlayPlayOrPause(double v);
     void slotPlayPlay(double v);
+    void slotPlayTogglePause(double v);
     void slotPlayPause(double v);
     void slotPlayStop(double v);
     void slotPlaySeekToTime(double timeSeconds);

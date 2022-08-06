@@ -101,6 +101,11 @@ void SidebarModel::activateDefaultSelection() {
     }
 }
 
+QModelIndex SidebarModel::getLibraryFeatureIndex(LibraryFeature* feature) {
+    int row = m_sFeatures.indexOf(feature);
+    return index(row, 0);
+}
+
 QModelIndex SidebarModel::index(int row, int column,
                                 const QModelIndex& parent) const {
     // qDebug() << "SidebarModel::index row=" << row

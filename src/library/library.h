@@ -172,6 +172,7 @@ class Library: public QObject {
     bool m_editMetadataSelectedClick;
     QScopedPointer<ControlObject> m_pKeyNotation;
 
+    WLibrary* m_pLibraryWidget;
     TrackModel* m_pCurrentTrackModel;
     int m_trackCursorEpoch;
     QString m_trackCursorTrackModelKey;
